@@ -1,0 +1,325 @@
+@import "tailwindcss";
+
+:root,
+:root[data-theme="light"],
+html[data-theme="light"] {
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --background: #f4f4f1;
+  --foreground: #12151b;
+  --muted: #6a7280;
+  --muted-soft: #939aa7;
+  --surface: rgba(255, 255, 255, 0.84);
+  --surface-strong: rgba(255, 255, 255, 0.94);
+  --surface-soft: #f7f7f4;
+  --surface-tint: rgba(92, 108, 127, 0.06);
+  --border: rgba(18, 21, 27, 0.08);
+  --border-strong: rgba(18, 21, 27, 0.12);
+  --accent-soft: rgba(92, 108, 127, 0.1);
+  --accent-strong: #5c6c7f;
+  --accent-ink: #425062;
+  --shadow-soft: 0 10px 28px rgba(18, 21, 27, 0.045);
+  --shadow-lifted: 0 18px 42px rgba(18, 21, 27, 0.06);
+  --shadow-chip: 0 6px 14px rgba(15, 23, 42, 0.06);
+  --page-glow: rgba(255, 255, 255, 0.96);
+  --page-gradient-top: #fafaf8;
+  --page-gradient-mid: #f4f4f1;
+  --page-gradient-bottom: #f2f3f5;
+  --surface-overlay: rgba(255, 255, 255, 0.72);
+  --surface-overlay-strong: rgba(255, 255, 255, 0.96);
+  --surface-hover: rgba(255, 255, 255, 0.7);
+  --shell-backdrop: rgba(244, 244, 241, 0.9);
+  --button-primary-bg: #12151b;
+  --button-primary-fg: #ffffff;
+  --button-secondary-bg: rgba(255, 255, 255, 0.74);
+  --button-secondary-hover: rgba(255, 255, 255, 0.92);
+  --icon-button-bg: rgba(255, 255, 255, 0.74);
+  --icon-button-hover: rgba(255, 255, 255, 0.92);
+  --input-focus-bg: #ffffff;
+  --progress-track: rgba(18, 21, 27, 0.06);
+  --accent-contrast: #ffffff;
+  --danger-strong: #b42318;
+  --focus-ring: rgba(92, 108, 127, 0.34);
+  --focus-ring-shadow: 0 0 0 4px rgba(92, 108, 127, 0.1);
+  --button-primary-shadow: 0 10px 20px rgba(18, 21, 27, 0.12);
+  --button-primary-shadow-hover: 0 12px 24px rgba(18, 21, 27, 0.14);
+}
+
+:root[data-theme="dark"],
+html[data-theme="dark"] {
+  --background: #0f1115;
+  --foreground: #eef2f7;
+  --muted: #9ba4b2;
+  --muted-soft: #778190;
+  --surface: rgba(20, 24, 30, 0.82);
+  --surface-strong: rgba(18, 21, 27, 0.92);
+  --surface-soft: #151a22;
+  --surface-tint: rgba(171, 184, 201, 0.08);
+  --border: rgba(226, 232, 240, 0.08);
+  --border-strong: rgba(226, 232, 240, 0.15);
+  --accent-soft: rgba(126, 145, 169, 0.18);
+  --accent-strong: #a9b7c8;
+  --accent-ink: #dce6f3;
+  --shadow-soft: 0 14px 34px rgba(0, 0, 0, 0.26);
+  --shadow-lifted: 0 22px 46px rgba(0, 0, 0, 0.32);
+  --shadow-chip: 0 10px 20px rgba(0, 0, 0, 0.28);
+  --page-glow: rgba(93, 111, 134, 0.18);
+  --page-gradient-top: #141821;
+  --page-gradient-mid: #0f1115;
+  --page-gradient-bottom: #0b0d11;
+  --surface-overlay: rgba(24, 29, 36, 0.82);
+  --surface-overlay-strong: rgba(28, 34, 42, 0.96);
+  --surface-hover: rgba(33, 39, 48, 0.9);
+  --shell-backdrop: rgba(15, 17, 21, 0.88);
+  --button-primary-bg: #eef2f7;
+  --button-primary-fg: #0f1115;
+  --button-secondary-bg: rgba(24, 29, 36, 0.86);
+  --button-secondary-hover: rgba(33, 39, 48, 0.94);
+  --icon-button-bg: rgba(24, 29, 36, 0.86);
+  --icon-button-hover: rgba(33, 39, 48, 0.94);
+  --input-focus-bg: rgba(28, 34, 42, 0.98);
+  --progress-track: rgba(226, 232, 240, 0.1);
+  --accent-contrast: #0f1115;
+  --danger-strong: #f97066;
+  --focus-ring: rgba(169, 183, 200, 0.38);
+  --focus-ring-shadow: 0 0 0 4px rgba(169, 183, 200, 0.12);
+  --button-primary-shadow: 0 16px 28px rgba(0, 0, 0, 0.28);
+  --button-primary-shadow-hover: 0 18px 30px rgba(0, 0, 0, 0.34);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-ui);
+  --font-serif: var(--font-ui);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+body {
+  margin: 0;
+  background-color: var(--background);
+  background-image:
+    radial-gradient(circle at top left, var(--page-glow), transparent 32%),
+    linear-gradient(
+      180deg,
+      var(--page-gradient-top) 0%,
+      var(--page-gradient-mid) 52%,
+      var(--page-gradient-bottom) 100%
+    );
+  color: var(--foreground);
+  font-family: var(--font-ui), system-ui, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+::selection {
+  background: rgba(113, 127, 151, 0.18);
+}
+
+.app-surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(12px);
+}
+
+.app-surface-strong {
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lifted);
+  backdrop-filter: blur(14px);
+}
+
+.app-surface-soft {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+}
+
+.app-panel {
+  border-radius: 24px;
+  padding: 1.15rem;
+}
+
+.app-panel-lg {
+  border-radius: 28px;
+  padding: 1.35rem;
+}
+
+.app-label {
+  color: var(--muted-soft);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.app-text-muted {
+  color: var(--muted);
+}
+
+.app-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.32rem 0.62rem;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.app-chip-muted {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.32rem 0.62rem;
+  background: var(--surface-overlay);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.app-button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.68rem 0.95rem;
+  background: var(--button-primary-bg);
+  color: var(--button-primary-fg);
+  transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
+  box-shadow: var(--button-primary-shadow);
+}
+
+.app-button-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--button-primary-shadow-hover);
+}
+
+.app-button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.68rem 0.95rem;
+  background: var(--button-secondary-bg);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.app-button-secondary:hover {
+  border-color: var(--border-strong);
+  background: var(--button-secondary-hover);
+  transform: translateY(-1px);
+}
+
+.app-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--icon-button-bg);
+  color: var(--muted);
+  transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
+}
+
+.app-icon-button:hover {
+  border-color: var(--border-strong);
+  color: var(--foreground);
+  background: var(--icon-button-hover);
+}
+
+.app-input {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-soft);
+  padding: 0.82rem 0.95rem;
+  color: var(--foreground);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.app-input::placeholder {
+  color: var(--muted-soft);
+}
+
+.app-input:focus {
+  outline: none;
+  border-color: var(--focus-ring);
+  box-shadow: var(--focus-ring-shadow);
+  background: var(--input-focus-bg);
+}
+
+.app-progress-track {
+  background: var(--progress-track);
+}
+
+.app-text-danger {
+  color: var(--danger-strong);
+}
+
+.app-toggle-button {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.6rem;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--button-secondary-bg);
+  color: var(--foreground);
+  padding: 0.75rem 0.9rem;
+  text-align: left;
+  font-size: 0.85rem;
+  line-height: 1.3;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.app-toggle-button:hover {
+  border-color: var(--border-strong);
+  background: var(--button-secondary-hover);
+  transform: translateY(-1px);
+}
+
+.app-toggle-button:focus-visible {
+  outline: none;
+  border-color: var(--focus-ring);
+  box-shadow: var(--focus-ring-shadow);
+}
