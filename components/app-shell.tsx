@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { MoonStar } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { BrandLogo } from "@/components/brand-logo";
 import { LanguageToggle } from "@/components/language-toggle";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TopNavigation } from "@/components/top-navigation";
@@ -73,7 +73,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen px-4 py-6 sm:px-6">
         <div className="mx-auto flex w-full max-w-[960px] items-center justify-between">
           <Link href="/" className="flex items-center gap-3 px-1 py-1">
-            <BrandLogo tagline={t("app.tagline")} imageClassName="h-14 sm:h-16" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]">
+              <MoonStar className="h-4.5 w-4.5" />
+            </div>
+            <div>
+              <p className="text-[15px] font-semibold tracking-[-0.02em] text-[color:var(--foreground)]">
+                {t("app.name")}
+              </p>
+              <p className="text-xs text-[color:var(--muted)]">{t("app.tagline")}</p>
+            </div>
           </Link>
           <div className="flex flex-wrap items-center gap-2">
             <LanguageToggle />
@@ -93,8 +101,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="mx-auto flex min-h-screen max-w-[1260px] gap-6 px-4 pb-8 pt-4 sm:px-6 lg:px-8">
         <aside className="hidden w-[216px] shrink-0 lg:block">
           <div className="sticky top-5 space-y-5">
-            <Link href="/" className="flex w-full items-start justify-start px-1 py-1">
-              <BrandLogo tagline={t("app.tagline")} imageClassName="h-24" />
+            <Link href="/" className="flex items-center gap-3 px-1 py-1">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]">
+                <MoonStar className="h-4.5 w-4.5" />
+              </div>
+              <div>
+                <p className="text-[15px] font-semibold tracking-[-0.02em] text-[color:var(--foreground)]">
+                  {t("app.name")}
+                </p>
+                <p className="text-xs text-[color:var(--muted)]">{t("app.tagline")}</p>
+              </div>
             </Link>
 
             <TopNavigation />
@@ -145,7 +161,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <div className="sticky top-0 z-20 border-b border-[color:var(--border)] bg-[color:var(--shell-backdrop)] px-1 py-3 backdrop-blur lg:hidden">
             <div className="mb-3 flex items-center justify-between px-3">
-              <BrandLogo tagline={t("app.tagline")} imageClassName="h-16" />
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]">
+                  <MoonStar className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <p className="text-lg font-semibold tracking-[-0.02em] text-[color:var(--foreground)]">
+                    {t("app.name")}
+                  </p>
+                  <p className="text-xs text-[color:var(--muted)]">{t("app.tagline")}</p>
+                </div>
+              </div>
               {!isHydrated ? (
                 <span className="text-xs text-[color:var(--muted)]">
                   {t("common.loading")}
