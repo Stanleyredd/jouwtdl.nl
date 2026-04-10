@@ -14,7 +14,8 @@ export function Footer() {
             className="transition-colors duration-200 hover:text-[color:var(--foreground)]"
           >
             KiralyAI
-          </a>
+          </a>{" "}
+          – AI solutions for businesses
         </p>
       </div>
     </footer>
