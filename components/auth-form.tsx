@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
 import { translateRuntimeMessage } from "@/lib/i18n";
@@ -75,8 +76,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   return (
     <section className="app-surface-strong app-panel-lg w-full max-w-[460px]">
       <div>
-        <p className="app-label">{t("app.name")}</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
+        <BrandLogo tagline={t("app.tagline")} imageClassName="h-24 sm:h-28" />
+        <h1 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
           {t(isLogin ? "auth.loginTitle" : "auth.signupTitle")}
         </h1>
         <p className="mt-2 text-sm leading-6 text-[color:var(--muted)]">

@@ -1,0 +1,20 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Clarity System app icon</title>
+  <desc>Dark rounded square app icon with white C arc mark and focus ring.</desc>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="230" fill="#1A1A1A"/>
+
+  <!-- C arc: center (512, 512), r=310, gap ±40° facing right -->
+  <!-- start: (512+310×0.766, 512−310×0.643) = (749.46, 312.67) -->
+  <!-- end:   (749.46, 711.33) -->
+  <path d="M 749.46 312.67 A 310 310 0 1 0 749.46 711.33"
+        fill="none" stroke="rgba(255,255,255,0.88)" stroke-width="22" stroke-linecap="round"/>
+
+  <!-- Focus ring -->
+  <circle cx="512" cy="512" r="75" fill="none" stroke="rgba(255,255,255,0.88)" stroke-width="8"/>
+
+  <!-- Center dot -->
+  <circle cx="512" cy="512" r="28" fill="rgba(255,255,255,0.88)"/>
+
+</svg>

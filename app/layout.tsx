@@ -11,9 +11,27 @@ import { ThemeProvider } from "@/providers/theme-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Clarity System",
+  applicationName: "jouwtdl",
+  title: {
+    default: "jouwtdl",
+    template: "%s | jouwtdl",
+  },
   description:
-    "A calm personal productivity and reflection system with structured planning, journaling, and soft AI guidance.",
+    "jouwtdl is a calm personal productivity and reflection app with structured planning, journaling, and gentle AI guidance.",
+  icons: {
+    icon: [
+      {
+        url: "/brand/jouwtdl-mono.svg",
+        type: "image/svg+xml",
+      },
+    ],
+    shortcut: [
+      {
+        url: "/brand/jouwtdl-mono.svg",
+        type: "image/svg+xml",
+      },
+    ],
+  },
 };
 
 export default async function RootLayout({

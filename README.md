@@ -1,6 +1,6 @@
-# Clarity System
+# jouwtdl
 
-Clarity System is now moving from a purely local MVP toward a real user-based architecture. This phase adds Supabase authentication, a user-owned database schema, row-level security, and a first fully migrated journal flow, while the rest of the product can still keep using the existing local-first planning/task foundation during the transition.
+jouwtdl is now moving from a purely local MVP toward a real user-based architecture. This phase adds Supabase authentication, a user-owned database schema, row-level security, and a first fully migrated journal flow, while the rest of the product can still keep using the existing local-first planning/task foundation during the transition.
 
 ## Stack
 

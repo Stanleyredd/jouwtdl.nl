@@ -1,0 +1,21 @@
+<svg width="4800" height="1600" viewBox="0 0 4800 1600" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Jouw TDL – primary logo</title>
+  <desc>Primary horizontal logo with C arc mark and wordmark, transparent background.</desc>
+
+  <!-- C arc: center (1840,800), r=344, gap ±40° facing right -->
+  <!-- start: (1840+344×0.766, 800−344×0.643)=(2103.5, 578.8) end:(2103.5, 1021.2) -->
+  <path d="M 2103.5 578.8 A 344 344 0 1 0 2103.5 1021.2"
+        fill="none" stroke="#7B9E8D" stroke-width="20" stroke-linecap="round"/>
+  <!-- Focus ring -->
+  <circle cx="1840" cy="800" r="84" fill="none" stroke="#7B9E8D" stroke-width="7"/>
+  <!-- Center dot -->
+  <circle cx="1840" cy="800" r="28" fill="#3B5C50"/>
+
+  <!-- Thin vertical divider -->
+  <line x1="2400" y1="512" x2="2400" y2="1088" stroke="#D4D1CB" stroke-width="4"/>
+
+  <!-- Wordmark -->
+  <text x="2520" y="768" font-family="-apple-system, 'Segoe UI', sans-serif" font-size="232" font-weight="500" fill="#1A1A1A" letter-spacing="2">Jouw</text>
+  <text x="2544" y="968" font-family="-apple-system, 'Segoe UI', sans-serif" font-size="96" font-weight="400" fill="#7B9E8D" letter-spacing="36">TDL</text>
+
+</svg>
