@@ -323,3 +323,15 @@ textarea {
   border-color: var(--focus-ring);
   box-shadow: var(--focus-ring-shadow);
 }
+
+.app-toggle-button-compact {
+  padding: 0.58rem 0.78rem;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: var(--surface-overlay);
+}
+
+.app-toggle-button-compact:hover {
+  color: var(--foreground);
+}

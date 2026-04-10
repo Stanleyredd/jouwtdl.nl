@@ -3,8 +3,9 @@
 import { Languages } from "lucide-react";
 
 import { useLanguage } from "@/hooks/use-language";
+import { cn } from "@/lib/utils";
 
-export function LanguageToggle() {
+export function LanguageToggle({ className }: { className?: string }) {
   const { language, setLanguage, t } = useLanguage();
   const nextLanguage = language === "nl" ? "en" : "nl";
   const label = `${t("language.label")}: ${t(`language.${language}`)}`;
@@ -13,7 +14,7 @@ export function LanguageToggle() {
     <button
       type="button"
       onClick={() => setLanguage(nextLanguage)}
-      className="app-toggle-button"
+      className={cn("app-toggle-button", className)}
       aria-label={label}
       title={label}
     >

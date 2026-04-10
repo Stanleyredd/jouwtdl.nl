@@ -70,27 +70,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isAuthPage) {
     return (
-      <div className="min-h-screen px-4 py-6 sm:px-6">
-        <div className="mx-auto flex w-full max-w-[960px] items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 px-1 py-1">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]">
-              <MoonStar className="h-4.5 w-4.5" />
+      <div className="min-h-screen px-4 py-8 sm:px-6 sm:py-10">
+        <main className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-[960px] items-center justify-center">
+          <div className="w-full max-w-[480px]">
+            <div className="mb-5 sm:mb-6">
+              <Link href="/" className="inline-flex items-center gap-3 px-1 py-1">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)] shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+                  <MoonStar className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <p className="text-[15px] font-semibold tracking-[-0.02em] text-[color:var(--foreground)]">
+                    {t("app.name")}
+                  </p>
+                  <p className="text-xs text-[color:var(--muted)]">{t("app.tagline")}</p>
+                </div>
+              </Link>
             </div>
-            <div>
-              <p className="text-[15px] font-semibold tracking-[-0.02em] text-[color:var(--foreground)]">
-                {t("app.name")}
-              </p>
-              <p className="text-xs text-[color:var(--muted)]">{t("app.tagline")}</p>
-            </div>
-          </Link>
-          <div className="flex flex-wrap items-center gap-2">
-            <LanguageToggle />
-            <ThemeToggle />
-          </div>
-        </div>
 
-        <main className="mx-auto flex min-h-[calc(100vh-88px)] w-full max-w-[960px] items-center justify-center py-8">
-          <div className="w-full max-w-[460px]">{children}</div>
+            <div className="mb-4 flex flex-wrap items-center gap-2 sm:mb-5">
+              <LanguageToggle className="app-toggle-button-compact sm:w-auto" />
+              <ThemeToggle className="app-toggle-button-compact sm:w-auto" />
+            </div>
+
+            <div className="w-full max-w-[460px]">{children}</div>
+          </div>
         </main>
       </div>
     );
