@@ -2,10 +2,26 @@ import { normalizeJournalSections } from "@/data/journal-template";
 import { createEmptyState, createSeedState } from "@/data/seed";
 import type { AppState } from "@/types";
 
-const STORAGE_KEY = "clarity-system::state";
+const STORAGE_PREFIX = "clarity-system::state";
 const CURRENT_VERSION = 1;
 
-export function loadAppState() {
+function getStorageKey(scope: string) {
+  return `${STORAGE_PREFIX}::${scope}`;
+}
+
+function createLocalBaselineState(useSeedData: boolean) {
+  const baseState = useSeedData ? createSeedState(new Date()) : createEmptyState();
+
+  return normalizeLoadedState({
+    ...baseState,
+    initializedAt: baseState.initializedAt || new Date().toISOString(),
+  });
+}
+
+export function loadAppState(options?: {
+  scope?: string;
+  useSeedData?: boolean;
+}) {
   if (typeof window === "undefined") {
     return {
       state: createEmptyState(),
@@ -13,12 +29,18 @@ export function loadAppState() {
     };
   }
 
+  const scope = options?.scope ?? "guest";
+  const useSeedData = options?.useSeedData ?? scope === "guest";
+  const storageKey = getStorageKey(scope);
+
   try {
-    const rawState = window.localStorage.getItem(STORAGE_KEY);
+    const rawState =
+      window.localStorage.getItem(storageKey) ??
+      (scope === "guest" ? window.localStorage.getItem(STORAGE_PREFIX) : null);
 
     if (!rawState) {
       return {
-        state: normalizeLoadedState(createSeedState(new Date())),
+        state: createLocalBaselineState(useSeedData),
         error: null,
       };
     }
@@ -27,8 +49,10 @@ export function loadAppState() {
 
     if (parsedState.version !== CURRENT_VERSION) {
       return {
-        state: normalizeLoadedState(createSeedState(new Date())),
-        error: "Saved data was from an older MVP version, so a fresh local workspace was created.",
+        state: createLocalBaselineState(useSeedData),
+        error: useSeedData
+          ? "Saved data was from an older MVP version, so a fresh local workspace was created."
+          : "Saved data was from an older local version, so this account received a clean local cache.",
       };
     }
 
@@ -38,8 +62,10 @@ export function loadAppState() {
     };
   } catch {
     return {
-      state: normalizeLoadedState(createSeedState(new Date())),
-      error: "There was a problem reading local data, so the app reset to a clean local seed.",
+      state: createLocalBaselineState(useSeedData),
+      error: useSeedData
+        ? "There was a problem reading local data, so the app reset to a clean local seed."
+        : "There was a problem reading the local cache for this account, so it was reset.",
     };
   }
 }
@@ -48,6 +74,7 @@ export function saveAppState(
   state: AppState,
   options?: {
     includeJournalEntries?: boolean;
+    scope?: string;
   },
 ) {
   if (typeof window === "undefined") {
@@ -63,7 +90,10 @@ export function saveAppState(
           }
         : state;
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToPersist));
+    window.localStorage.setItem(
+      getStorageKey(options?.scope ?? "guest"),
+      JSON.stringify(stateToPersist),
+    );
     return null;
   } catch {
     return "Local data could not be saved. Check browser storage settings and try again.";

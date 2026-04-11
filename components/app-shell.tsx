@@ -17,7 +17,8 @@ import { translateRuntimeMessage } from "@/lib/i18n";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isHydrated, storageError, journalError } = useAppState();
+  const { isHydrated, isPlanningReady, storageError, planningError, journalError } =
+    useAppState();
   const {
     user,
     signOut,
@@ -31,7 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isAuthPage = pathname === "/login" || pathname === "/signup";
   const isSetupPage = pathname === "/setup";
-  const interfaceReady = isHydrated && (!user || isProfileReady);
+  const interfaceReady = isHydrated && isPlanningReady && (!user || isProfileReady);
 
   useEffect(() => {
     if (!isConfigured || !isAuthReady || !user || !isProfileReady) {
@@ -228,15 +229,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <main className="flex-1 py-5 lg:py-7">
-              {storageError ? (
-                <div className="app-surface app-panel mb-5 text-sm text-[color:var(--muted)]">
-                  {translateRuntimeMessage(storageError, language)}
-                </div>
-              ) : null}
+            {storageError ? (
+              <div className="app-surface app-panel mb-5 text-sm text-[color:var(--muted)]">
+                {translateRuntimeMessage(storageError, language)}
+              </div>
+            ) : null}
 
-              {journalError ? (
-                <div className="app-surface app-panel mb-5 text-sm text-[color:var(--muted)]">
-                  {translateRuntimeMessage(journalError, language)}
+            {planningError ? (
+              <div className="app-surface app-panel mb-5 text-sm text-[color:var(--muted)]">
+                {translateRuntimeMessage(planningError, language)}
+              </div>
+            ) : null}
+
+            {journalError ? (
+              <div className="app-surface app-panel mb-5 text-sm text-[color:var(--muted)]">
+                {translateRuntimeMessage(journalError, language)}
                 </div>
               ) : null}
 

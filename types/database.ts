@@ -159,6 +159,174 @@ export interface Database {
         };
         Relationships: [];
       };
+      monthly_goals: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          description: string;
+          month: number;
+          year: number;
+          life_area: string;
+          status: string;
+          progress: number;
+          due_date: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          user_id: string;
+          title: string;
+          description?: string;
+          month: number;
+          year: number;
+          life_area: string;
+          status?: string;
+          progress?: number;
+          due_date?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          description?: string;
+          month?: number;
+          year?: number;
+          life_area?: string;
+          status?: string;
+          progress?: number;
+          due_date?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      weekly_goals: {
+        Row: {
+          id: string;
+          user_id: string;
+          monthly_goal_id: string | null;
+          title: string;
+          description: string;
+          week_number: number;
+          start_date: string;
+          end_date: string;
+          life_area: string;
+          status: string;
+          progress: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          user_id: string;
+          monthly_goal_id?: string | null;
+          title: string;
+          description?: string;
+          week_number: number;
+          start_date: string;
+          end_date: string;
+          life_area: string;
+          status?: string;
+          progress?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          monthly_goal_id?: string | null;
+          title?: string;
+          description?: string;
+          week_number?: number;
+          start_date?: string;
+          end_date?: string;
+          life_area?: string;
+          status?: string;
+          progress?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      daily_tasks: {
+        Row: {
+          id: string;
+          user_id: string;
+          weekly_goal_id: string | null;
+          title: string;
+          note: string;
+          date: string;
+          priority: string;
+          life_area: string;
+          completed: boolean;
+          carry_over_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          user_id: string;
+          weekly_goal_id?: string | null;
+          title: string;
+          note?: string;
+          date: string;
+          priority?: string;
+          life_area: string;
+          completed?: boolean;
+          carry_over_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          weekly_goal_id?: string | null;
+          title?: string;
+          note?: string;
+          date?: string;
+          priority?: string;
+          life_area?: string;
+          completed?: boolean;
+          carry_over_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      daily_focuses: {
+        Row: {
+          id: string;
+          user_id: string;
+          date: string;
+          main_focus: string;
+          secondary_focuses: string[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          user_id: string;
+          date: string;
+          main_focus?: string;
+          secondary_focuses?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          date?: string;
+          main_focus?: string;
+          secondary_focuses?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

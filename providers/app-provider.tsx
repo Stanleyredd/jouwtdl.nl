@@ -22,6 +22,10 @@ import {
   saveJournalEntryForUser,
   updateJournalSummaryForUser,
 } from "@/services/journal-persistence-service";
+import {
+  listPlanningStateForUser,
+  savePlanningStateForUser,
+} from "@/services/planning-persistence-service";
 import { recalculateAppState } from "@/services/planning-service";
 import { loadAppState, saveAppState } from "@/services/storage-service";
 import type {
@@ -41,9 +45,12 @@ import type {
 interface AppContextValue {
   state: AppState;
   isHydrated: boolean;
+  isPlanningReady: boolean;
+  planningStatus: "idle" | "loading" | "ready" | "error";
   isJournalReady: boolean;
   journalStatus: "idle" | "loading" | "ready" | "error";
   storageError: string | null;
+  planningError: string | null;
   journalError: string | null;
   addMonthlyGoal: (input: MonthlyGoalInput) => void;
   updateMonthlyGoal: (id: string, updates: Partial<MonthlyGoal>) => void;
@@ -150,37 +157,181 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const { language } = useLanguage();
   const [state, setState] = useState<AppState>(() => createEmptyState());
   const [isHydrated, setIsHydrated] = useState(false);
+  const [hydratedScope, setHydratedScope] = useState<string | null>(null);
   const [storageError, setStorageError] = useState<string | null>(null);
+  const [planningStatus, setPlanningStatus] = useState<"idle" | "loading" | "ready" | "error">(
+    "idle",
+  );
+  const [planningError, setPlanningError] = useState<string | null>(null);
   const [journalStatus, setJournalStatus] = useState<"idle" | "loading" | "ready" | "error">(
     "idle",
   );
   const [journalError, setJournalError] = useState<string | null>(null);
+  const storageScope = isConfigured && user ? `user:${user.id}` : "guest";
+  const shouldSeedLocalState = !isConfigured || !user;
   const journalRequestIdRef = useRef(0);
+  const planningRequestIdRef = useRef(0);
+  const planningSyncTimeoutRef = useRef<number | null>(null);
+  const hasPlanningBaselineRef = useRef(false);
 
   useEffect(() => {
+    if (isConfigured && !isAuthReady) {
+      return;
+    }
+
+    setIsHydrated(false);
+    setHydratedScope(null);
+    setPlanningStatus("idle");
+    setPlanningError(null);
+    hasPlanningBaselineRef.current = !Boolean(isConfigured && user && supabase);
+
     const timeoutId = window.setTimeout(() => {
-      const loaded = loadAppState();
+      const loaded = loadAppState({
+        scope: storageScope,
+        useSeedData: shouldSeedLocalState,
+      });
+
       setState(recalculateAppState(loaded.state));
       setStorageError(loaded.error);
+      setHydratedScope(storageScope);
       setIsHydrated(true);
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, []);
+  }, [isAuthReady, isConfigured, shouldSeedLocalState, storageScope, supabase, user]);
 
   useEffect(() => {
-    if (!isHydrated) {
+    if (!isHydrated || hydratedScope !== storageScope) {
       return;
     }
 
     const saveError = saveAppState(state, {
       includeJournalEntries: !(isConfigured && user && supabase),
+      scope: storageScope,
     });
     setStorageError(saveError);
-  }, [isConfigured, isHydrated, state, supabase, user]);
+  }, [hydratedScope, isConfigured, isHydrated, state, storageScope, supabase, user]);
 
   useEffect(() => {
-    if (!isHydrated || !isAuthReady) {
+    if (!isHydrated || hydratedScope !== storageScope || !isAuthReady) {
+      return;
+    }
+
+    if (!isConfigured) {
+      setPlanningError(null);
+      setPlanningStatus("ready");
+      hasPlanningBaselineRef.current = true;
+      return;
+    }
+
+    planningRequestIdRef.current += 1;
+    const requestId = planningRequestIdRef.current;
+
+    if (!user || !supabase) {
+      setPlanningError(null);
+      setPlanningStatus("ready");
+      hasPlanningBaselineRef.current = true;
+      return;
+    }
+
+    setPlanningStatus("loading");
+    setPlanningError(null);
+    hasPlanningBaselineRef.current = false;
+
+    void listPlanningStateForUser(supabase, user.id)
+      .then((planningState) => {
+        if (planningRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        setState((currentState) =>
+          recalculateAppState({
+            ...currentState,
+            ...planningState,
+          }),
+        );
+        setPlanningStatus("ready");
+        setPlanningError(null);
+        hasPlanningBaselineRef.current = true;
+      })
+      .catch((caughtError) => {
+        if (planningRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        setPlanningStatus("error");
+        setPlanningError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Planning data could not be loaded right now.",
+        );
+        hasPlanningBaselineRef.current = true;
+      });
+  }, [hydratedScope, isAuthReady, isConfigured, isHydrated, storageScope, supabase, user]);
+
+  useEffect(() => {
+    if (planningSyncTimeoutRef.current) {
+      window.clearTimeout(planningSyncTimeoutRef.current);
+      planningSyncTimeoutRef.current = null;
+    }
+
+    if (!isHydrated || hydratedScope !== storageScope) {
+      return;
+    }
+
+    if (!(isConfigured && user && supabase)) {
+      return;
+    }
+
+    if (!hasPlanningBaselineRef.current || planningStatus === "loading") {
+      return;
+    }
+
+    planningSyncTimeoutRef.current = window.setTimeout(() => {
+      void savePlanningStateForUser({
+        client: supabase,
+        userId: user.id,
+        state: {
+          monthlyGoals: state.monthlyGoals,
+          weeklyGoals: state.weeklyGoals,
+          dailyTasks: state.dailyTasks,
+          dailyFocuses: state.dailyFocuses,
+        },
+      })
+        .then(() => {
+          setPlanningError(null);
+        })
+        .catch((caughtError) => {
+          setPlanningError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : "Planning data could not be saved right now.",
+          );
+        });
+    }, 160);
+
+    return () => {
+      if (planningSyncTimeoutRef.current) {
+        window.clearTimeout(planningSyncTimeoutRef.current);
+        planningSyncTimeoutRef.current = null;
+      }
+    };
+  }, [
+    hydratedScope,
+    isConfigured,
+    isHydrated,
+    planningStatus,
+    state.dailyFocuses,
+    state.dailyTasks,
+    state.monthlyGoals,
+    state.weeklyGoals,
+    storageScope,
+    supabase,
+    user,
+  ]);
+
+  useEffect(() => {
+    if (!isHydrated || hydratedScope !== storageScope || !isAuthReady) {
       return;
     }
 
@@ -241,7 +392,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
             : "Journal entries could not be loaded right now.",
         );
       });
-  }, [isAuthReady, isConfigured, isHydrated, state.lifeAreas, supabase, user]);
+  }, [
+    hydratedScope,
+    isAuthReady,
+    isConfigured,
+    isHydrated,
+    state.lifeAreas,
+    storageScope,
+    supabase,
+    user,
+  ]);
 
   const commit = useCallback((updater: (currentState: AppState) => AppState) => {
     setState((currentState) => recalculateAppState(updater(currentState)));
@@ -251,9 +411,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return {
       state,
       isHydrated,
+      isPlanningReady: planningStatus !== "loading",
+      planningStatus,
       isJournalReady: journalStatus !== "loading",
       journalStatus,
       storageError,
+      planningError,
       journalError,
       addMonthlyGoal(input) {
         commit((currentState) => ({
@@ -684,6 +847,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     journalError,
     journalStatus,
     language,
+    planningError,
+    planningStatus,
     state,
     storageError,
     supabase,
