@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Profile {
+  id                     String         @id @db.Uuid
+  email                  String         @default("")
+  language               String         @default("nl")
+  theme                  String         @default("light")
+  showTomorrow           Boolean        @default(true) @map("show_tomorrow")
+  journalSectionsEnabled Json           @map("journal_sections_enabled")
+  onboardingCompleted    Boolean        @default(false) @map("onboarding_completed")
+  journalPreset          String?        @map("journal_preset")
+  journalConfig          Json?          @map("journal_config")
+  createdAt              DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  journalEntries         JournalEntry[]
+  monthlyGoals           MonthlyGoal[]
+  weeklyGoals            WeeklyGoal[]
+  dailyTasks             DailyTask[]
+  dailyFocuses           DailyFocus[]
+
+  @@map("profiles")
+}
+
+model JournalEntry {
+  id                 String          @id @default(uuid()) @db.Uuid
+  userId             String          @map("user_id") @db.Uuid
+  entryDate          DateTime        @map("entry_date") @db.Date
+  language           String          @default("nl")
+  rawTranscript      String          @default("") @map("raw_transcript")
+  editedTranscript   String          @default("") @map("edited_transcript")
+  aiSummary          String          @default("") @map("ai_summary")
+  aiSummaryError     String?         @map("ai_summary_error")
+  aiSummaryUpdatedAt DateTime?       @map("ai_summary_updated_at") @db.Timestamptz(6)
+  createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user               Profile         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sections           JournalSection[]
+  tomorrowSetup      TomorrowSetup?
+
+  @@unique([userId, entryDate])
+  @@unique([id, userId])
+  @@map("journal_entries")
+}
+
+model JournalSection {
+  id             String       @id @default(uuid()) @db.Uuid
+  journalEntryId String       @map("journal_entry_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  sectionKey     String       @map("section_key")
+  content        String       @default("")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  journalEntry   JournalEntry @relation(fields: [journalEntryId, userId], references: [id, userId], onDelete: Cascade)
+
+  @@unique([journalEntryId, sectionKey])
+  @@map("journal_sections")
+}
+
+model TomorrowSetup {
+  id            String       @id @default(uuid()) @db.Uuid
+  journalEntryId String      @map("journal_entry_id") @db.Uuid
+  userId        String       @map("user_id") @db.Uuid
+  focus         String       @default("")
+  topTasks      String[]     @default([]) @map("top_tasks")
+  watchOutFor   String       @default("") @map("watch_out_for")
+  intention     String       @default("")
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  journalEntry  JournalEntry @relation(fields: [journalEntryId, userId], references: [id, userId], onDelete: Cascade)
+
+  @@unique([journalEntryId, userId])
+  @@map("tomorrow_setups")
+}
+
+model MonthlyGoal {
+  id          String       @id
+  userId      String       @map("user_id") @db.Uuid
+  title       String       @default("")
+  description String       @default("")
+  month       Int
+  year        Int
+  lifeArea    String       @default("") @map("life_area")
+  status      String       @default("not_started")
+  progress    Int          @default(0)
+  dueDate     DateTime?    @map("due_date") @db.Date
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user        Profile      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weeklyGoals WeeklyGoal[]
+
+  @@unique([id, userId])
+  @@map("monthly_goals")
+}
+
+model WeeklyGoal {
+  id            String       @id
+  userId        String       @map("user_id") @db.Uuid
+  monthlyGoalId String?      @map("monthly_goal_id")
+  title         String       @default("")
+  description   String       @default("")
+  weekNumber    Int          @map("week_number")
+  startDate     DateTime     @map("start_date") @db.Date
+  endDate       DateTime     @map("end_date") @db.Date
+  lifeArea      String       @default("") @map("life_area")
+  status        String       @default("not_started")
+  progress      Int          @default(0)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user          Profile      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monthlyGoal   MonthlyGoal? @relation(fields: [monthlyGoalId, userId], references: [id, userId], onDelete: SetNull)
+  dailyTasks    DailyTask[]
+
+  @@unique([id, userId])
+  @@map("weekly_goals")
+}
+
+model DailyTask {
+  id             String      @id
+  userId         String      @map("user_id") @db.Uuid
+  weeklyGoalId   String?     @map("weekly_goal_id")
+  title          String      @default("")
+  note           String      @default("")
+  date           DateTime    @db.Date
+  priority       String      @default("medium")
+  lifeArea       String      @default("") @map("life_area")
+  completed      Boolean     @default(false)
+  carryOverCount Int         @default(0) @map("carry_over_count")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user           Profile     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weeklyGoal     WeeklyGoal? @relation(fields: [weeklyGoalId, userId], references: [id, userId], onDelete: SetNull)
+
+  @@unique([id, userId])
+  @@map("daily_tasks")
+}
+
+model DailyFocus {
+  id               String   @id
+  userId           String   @map("user_id") @db.Uuid
+  date             DateTime @db.Date
+  mainFocus        String   @default("") @map("main_focus")
+  secondaryFocuses String[] @default([]) @map("secondary_focuses")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user             Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("daily_focuses")
+}

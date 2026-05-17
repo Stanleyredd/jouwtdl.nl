@@ -1,6 +1,6 @@
 # jouwtdl
 
-jouwtdl is now moving from a purely local MVP toward a real user-based architecture. This phase adds Supabase authentication, a user-owned database schema, row-level security, and a first fully migrated journal flow, while the rest of the product can still keep using the existing local-first planning/task foundation during the transition.
+jouwtdl is moving in careful phases from a purely local MVP toward a fully self-hosted multi-user product. The current runtime still relies on Supabase for authentication and the first migrated persistence flows, while phase 1 of the PostgreSQL migration adds Prisma, a self-hosted PostgreSQL connection, and a minimal database health-check foundation without rewriting the working app behavior yet.
 
 ## Stack
 
@@ -8,6 +8,7 @@ jouwtdl is now moving from a purely local MVP toward a real user-based architect
 - React + TypeScript
 - Tailwind CSS
 - Supabase Auth + Postgres + Row Level Security
+- Prisma + self-hosted PostgreSQL foundation
 - Local storage persistence for not-yet-migrated planning/task flows
 - Modular services for planning, storage, transcription, Supabase journal persistence, and AI-style analysis
 
@@ -30,10 +31,19 @@ data/                 Journal schema, default life areas, seed state
 hooks/                App state and voice transcription hooks
 lib/                  Date helpers, i18n, auth, and Supabase clients
 providers/            Language, auth, app state, and journal voice providers
+prisma/               Prisma schema foundation for the self-hosted PostgreSQL migration
+prisma.config.ts      Prisma 7 datasource config for CLI commands
 services/             Planning, storage, Supabase journal persistence, and analysis logic
 supabase/             SQL schema and RLS setup
 types/                Shared domain models and database types
 ```
+
+## Database Migration Direction
+
+- Supabase remains active for the current auth and migrated persistence flows.
+- Prisma is now added as the first self-hosted PostgreSQL layer.
+- The app does not yet read or write core product data through Prisma in this phase.
+- The first Prisma-backed endpoint is `/api/db-health`, which verifies that `DATABASE_URL` is reachable.
 
 ## Current Persistence Split
 
@@ -144,15 +154,37 @@ Then open [http://localhost:3000](http://localhost:3000).
 Create `.env.local` with:
 
 ```bash
+DATABASE_URL="postgresql://jouwtdl_user:Wewillenverdienen3!@localhost:5432/jouwtdl"
+AUTH_SECRET=your_auth_secret_here
+NEXTAUTH_URL=http://localhost:3000
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_or_publishable_key
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_SUMMARY_MODEL=gpt-5-mini # optional
 ```
 
+You can start from `/Users/stanleyreddemann/Projecten/To-do-list-app/.env.example`.
+
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` is the expected public client key for this repo. If your Supabase project already uses the newer publishable key naming, you can also set `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; the app supports that as a fallback.
 
 Without Supabase configuration, the auth flow will show a setup warning and the app falls back to the older local-only behavior where possible. Without `OPENAI_API_KEY`, server transcription and AI journal summaries will return a configuration error.
+
+### PostgreSQL + Prisma Setup
+
+1. Make sure PostgreSQL is running and that the database in `DATABASE_URL` exists.
+2. Copy `/Users/stanleyreddemann/Projecten/To-do-list-app/.env.example` to `.env.local` and fill in the values you want to use.
+3. Run `npm install`.
+4. Run `npx prisma generate`.
+5. Start the app with `npm run dev`.
+6. Open [http://localhost:3000/api/db-health](http://localhost:3000/api/db-health) to verify Prisma can connect to PostgreSQL.
+
+This phase does not replace Supabase yet. You still need the current Supabase environment variables for the working auth and journal runtime.
+
+Prisma 7 note:
+
+- CLI connection config now lives in `/Users/stanleyreddemann/Projecten/To-do-list-app/prisma.config.ts`
+- runtime database access uses a PostgreSQL driver adapter from `@prisma/adapter-pg`
+- the app still imports Prisma through `/Users/stanleyreddemann/Projecten/To-do-list-app/lib/prisma.ts`
 
 ### Supabase Setup
 
