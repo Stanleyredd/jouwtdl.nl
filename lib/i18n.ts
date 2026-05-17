@@ -45,6 +45,7 @@ const dictionaries: Record<AppLanguage, TranslationDictionary> = {
     "auth.signingUp": "Account maken...",
     "auth.loginSuccess": "Je bent ingelogd.",
     "auth.signupSuccess": "Je account is klaar.",
+    "auth.accountCreated": "Je account is aangemaakt. Log nu in om verder te gaan.",
     "auth.checkEmail": "Controleer je e-mail om je account te bevestigen.",
     "auth.genericError": "Inloggen lukt nu niet. Probeer opnieuw.",
     "auth.noAccount": "Nog geen account?",
@@ -56,7 +57,7 @@ const dictionaries: Record<AppLanguage, TranslationDictionary> = {
     "auth.loggedIn": "Ingelogd",
     "auth.loggedOut": "Niet ingelogd",
     "auth.notLoggedIn": "Geen account actief",
-    "auth.configMissing": "Supabase is nog niet ingesteld. Voeg NEXT_PUBLIC_SUPABASE_URL en NEXT_PUBLIC_SUPABASE_ANON_KEY toe aan .env.local.",
+    "auth.configMissing": "Authenticatie is nog niet ingesteld. Voeg DATABASE_URL en AUTH_SECRET toe aan de serveromgeving.",
     "settings.eyebrow": "Instellingen",
     "settings.journalTitle": "Journal-instelling",
     "settings.journalDescription": "Pas je persoonlijke journalstructuur op elk moment aan.",
@@ -347,6 +348,7 @@ const dictionaries: Record<AppLanguage, TranslationDictionary> = {
     "auth.signingUp": "Creating account...",
     "auth.loginSuccess": "You are logged in.",
     "auth.signupSuccess": "Your account is ready.",
+    "auth.accountCreated": "Your account is ready. Log in to continue.",
     "auth.checkEmail": "Check your email to confirm your account.",
     "auth.genericError": "Signing in is not working right now. Try again.",
     "auth.noAccount": "No account yet?",
@@ -358,7 +360,7 @@ const dictionaries: Record<AppLanguage, TranslationDictionary> = {
     "auth.loggedIn": "Logged in",
     "auth.loggedOut": "Not logged in",
     "auth.notLoggedIn": "No active account",
-    "auth.configMissing": "Supabase is not configured yet. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.",
+    "auth.configMissing": "Authentication is not configured yet. Add DATABASE_URL and AUTH_SECRET to the server environment.",
     "settings.eyebrow": "Settings",
     "settings.journalTitle": "Journal settings",
     "settings.journalDescription": "Adjust your personal journal structure whenever you need to.",
@@ -795,6 +797,38 @@ const runtimeMessageTranslations: Record<string, { nl: string; en: string }> = {
   "Supabase is not configured yet. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.": {
     nl: "Supabase is nog niet ingesteld. Voeg NEXT_PUBLIC_SUPABASE_URL en NEXT_PUBLIC_SUPABASE_ANON_KEY toe aan .env.local.",
     en: "Supabase is not configured yet. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.",
+  },
+  "Authentication is not configured yet. Add DATABASE_URL and AUTH_SECRET to the server environment.": {
+    nl: "Authenticatie is nog niet ingesteld. Voeg DATABASE_URL en AUTH_SECRET toe aan de serveromgeving.",
+    en: "Authentication is not configured yet. Add DATABASE_URL and AUTH_SECRET to the server environment.",
+  },
+  "Invalid email or password.": {
+    nl: "Ongeldig e-mailadres of wachtwoord.",
+    en: "Invalid email or password.",
+  },
+  "Login could not be completed right now.": {
+    nl: "Inloggen lukt nu niet. Probeer opnieuw.",
+    en: "Login could not be completed right now.",
+  },
+  "Enter a valid email address.": {
+    nl: "Vul een geldig e-mailadres in.",
+    en: "Enter a valid email address.",
+  },
+  "Use at least 8 characters for your password.": {
+    nl: "Gebruik minimaal 8 tekens voor je wachtwoord.",
+    en: "Use at least 8 characters for your password.",
+  },
+  "An account with this email already exists.": {
+    nl: "Er bestaat al een account met dit e-mailadres.",
+    en: "An account with this email already exists.",
+  },
+  "Your account is ready. Log in to continue.": {
+    nl: "Je account is klaar. Log in om verder te gaan.",
+    en: "Your account is ready. Log in to continue.",
+  },
+  "Your account could not be created right now.": {
+    nl: "Je account kon nu niet worden aangemaakt.",
+    en: "Your account could not be created right now.",
   },
   "Journal entries could not be loaded right now.": {
     nl: "Journal-entries konden nu niet worden geladen.",

@@ -1,17 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
-import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
 import { translateRuntimeMessage } from "@/lib/i18n";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { supabase, isConfigured } = useAuth();
   const { language, t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,47 +19,75 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   );
   const [message, setMessage] = useState("");
 
-  const nextPath = searchParams.get("next") || "/";
+  const nextPath =
+    searchParams.get("next") || searchParams.get("callbackUrl") || "/";
   const isLogin = mode === "login";
+  const accountCreated = searchParams.get("created") === "1";
+  const authSwitchHref = `${isLogin ? "/signup" : "/login"}${
+    nextPath !== "/" ? `?next=${encodeURIComponent(nextPath)}` : ""
+  }`;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!supabase || !isConfigured) {
-      setStatus("error");
-      setMessage(t("auth.configMissing"));
-      return;
-    }
 
     setStatus("submitting");
     setMessage("");
 
     try {
-      const authResult = isLogin
-        ? await supabase.auth.signInWithPassword({
-            email: email.trim(),
-            password,
-          })
-        : await supabase.auth.signUp({
-            email: email.trim(),
-            password,
-          });
+      const normalizedEmail = email.trim().toLowerCase();
 
-      if (authResult.error) {
-        throw authResult.error;
-      }
+      if (isLogin) {
+        const result = await signIn("credentials", {
+          email: normalizedEmail,
+          password,
+          redirect: false,
+          callbackUrl: nextPath,
+        });
 
-      const session = authResult.data.session;
+        if (!result || !result.ok || result.error) {
+          throw new Error(
+            result?.error === "CredentialsSignin"
+              ? "Invalid email or password."
+              : result?.error || "Login could not be completed right now.",
+          );
+        }
 
-      if (!isLogin && !session) {
         setStatus("success");
-        setMessage(t("auth.checkEmail"));
+        setMessage(t("auth.loginSuccess"));
+        router.replace(result.url ?? nextPath);
+        router.refresh();
         return;
       }
 
+      const response = await fetch("/api/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          password,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            message?: string;
+          }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ?? "Your account could not be created right now.",
+        );
+      }
+
       setStatus("success");
-      setMessage(t(isLogin ? "auth.loginSuccess" : "auth.signupSuccess"));
-      router.replace(nextPath);
+      setMessage(data?.message ?? t("auth.signupSuccess"));
+      router.replace(
+        `/login?created=1${nextPath !== "/" ? `&next=${encodeURIComponent(nextPath)}` : ""}`,
+      );
       router.refresh();
     } catch (caughtError) {
       setStatus("error");
@@ -82,12 +109,6 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           {t(isLogin ? "auth.loginDescription" : "auth.signupDescription")}
         </p>
       </div>
-
-      {!isConfigured ? (
-        <div className="mt-5 rounded-[18px] border border-[color:var(--border)] bg-[color:var(--surface-overlay)] px-4 py-3 text-sm leading-6 text-[color:var(--muted)]">
-          {t("auth.configMissing")}
-        </div>
-      ) : null}
 
       <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-2">
@@ -136,11 +157,15 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           >
             {message}
           </p>
+        ) : isLogin && accountCreated ? (
+          <p className="text-sm text-[color:var(--accent-strong)]">
+            {t("auth.accountCreated")}
+          </p>
         ) : null}
 
         <button
           type="submit"
-          disabled={status === "submitting" || !isConfigured}
+          disabled={status === "submitting"}
           className="app-button-primary w-full justify-center text-sm"
         >
           {status === "submitting"
@@ -152,7 +177,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       <p className="mt-5 text-sm text-[color:var(--muted)]">
         {isLogin ? t("auth.noAccount") : t("auth.haveAccount")}{" "}
         <Link
-          href={isLogin ? "/signup" : "/login"}
+          href={authSwitchHref}
           className="font-medium text-[color:var(--foreground)]"
         >
           {t(isLogin ? "auth.goSignup" : "auth.goLogin")}

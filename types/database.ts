@@ -13,6 +13,7 @@ export interface Database {
         Row: {
           id: string;
           email: string;
+          password_hash: string | null;
           language: string;
           theme: string;
           show_tomorrow: boolean;
@@ -26,6 +27,7 @@ export interface Database {
         Insert: {
           id: string;
           email: string;
+          password_hash?: string | null;
           language?: string;
           theme?: string;
           show_tomorrow?: boolean;
@@ -39,6 +41,7 @@ export interface Database {
         Update: {
           id?: string;
           email?: string;
+          password_hash?: string | null;
           language?: string;
           theme?: string;
           show_tomorrow?: boolean;

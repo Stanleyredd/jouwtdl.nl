@@ -1,6 +1,11 @@
 "use client";
 
-import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
+import type { Session } from "next-auth";
+import {
+  SessionProvider,
+  signOut as nextAuthSignOut,
+  useSession,
+} from "next-auth/react";
 import {
   createContext,
   useCallback,
@@ -11,19 +16,13 @@ import {
   type ReactNode,
 } from "react";
 
-import { createClient } from "@/lib/supabase/client";
-import { isSupabaseConfigured } from "@/lib/supabase/shared";
-import {
-  ensureProfileForUser,
-  updateProfileForUser,
-} from "@/services/profile-service";
-import type { Database } from "@/types/database";
+import type { AuthenticatedUser } from "@/lib/auth";
 import type { JournalConfig, JournalPreset, UserProfile } from "@/types";
 
 interface AuthContextValue {
-  user: User | null;
+  user: AuthenticatedUser | null;
   session: Session | null;
-  supabase: SupabaseClient<Database> | null;
+  supabase: null;
   isConfigured: boolean;
   isReady: boolean;
   profile: UserProfile | null;
@@ -110,70 +109,36 @@ function serializeAuthError(error: unknown) {
   };
 }
 
-function wait(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-async function resolveClientSessionUser(
-  supabase: SupabaseClient<Database>,
-  fallbackUser: User,
-) {
-  for (const attempt of [1, 2]) {
-    const { data, error } = await supabase.auth.getUser();
-
-    logAuthProfileEvent("client-auth-check", {
-      attempt,
-      fallbackUserId: fallbackUser.id,
-      resolvedUserId: data.user?.id ?? null,
-      error: error
-        ? {
-            name: error.name,
-            message: error.message,
-            status: error.status,
-            code: error.code,
-          }
-        : null,
-    });
-
-    if (data.user) {
-      return data.user;
-    }
-
-    if (attempt === 1) {
-      await wait(150);
-    }
+function getSessionUser(session: Session | null | undefined): AuthenticatedUser | null {
+  if (!session?.user?.id) {
+    return null;
   }
 
-  return fallbackUser;
+  return {
+    id: session.user.id,
+    email: session.user.email ?? null,
+  };
 }
 
-export function AuthProvider({
+function AuthProviderInner({
   children,
   initialUser,
 }: {
   children: ReactNode;
-  initialUser: User | null;
+  initialUser: AuthenticatedUser | null;
 }) {
-  const isConfigured = isSupabaseConfigured();
-  const supabase = useMemo(
-    () => (isConfigured ? createClient() : null),
-    [isConfigured],
-  );
-  const [user, setUser] = useState<User | null>(initialUser);
-  const [session, setSession] = useState<Session | null>(null);
-  const [isReady, setIsReady] = useState(!isConfigured);
+  const { data: session, status } = useSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isProfileReady, setIsProfileReady] = useState(!isConfigured);
+  const [isProfileReady, setIsProfileReady] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const resolvedSession = session ?? null;
+  const resolvedUser = useMemo(
+    () => getSessionUser(resolvedSession) ?? (status === "loading" ? initialUser : null),
+    [initialUser, resolvedSession, status],
+  );
+  const isReady = status !== "loading";
 
-  const hydrateProfile = useCallback(async (nextUser: User | null) => {
-    if (!isConfigured) {
-      setProfile(null);
-      setProfileError(null);
-      setIsProfileReady(true);
-      return;
-    }
-
+  const hydrateProfile = useCallback(async (nextUser: AuthenticatedUser | null) => {
     if (!nextUser) {
       setProfile(null);
       setProfileError(null);
@@ -189,142 +154,70 @@ export function AuthProvider({
         userId: nextUser.id,
       });
 
-      let result:
-        | Awaited<ReturnType<typeof requestProfile>>
-        | null = null;
-
-      try {
-        result = await requestProfile("GET");
-      } catch (requestError) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("[auth-provider]", "profile-load-request-failed", {
-            userId: nextUser.id,
-            message:
-              requestError instanceof Error
-                ? requestError.message
-                : "Unknown profile request failure.",
-          });
-        }
-      }
+      const result = await requestProfile("GET");
 
       logAuthProfileEvent("profile-load-result", {
         userId: nextUser.id,
-        ok: result?.ok ?? false,
-        status: result?.status ?? null,
-        hasProfile: Boolean(result?.data?.profile),
-        error: result?.data?.error ?? null,
+        ok: result.ok,
+        status: result.status,
+        hasProfile: Boolean(result.data?.profile),
+        error: result.data?.error ?? null,
       });
 
-      if (!result?.ok || !result.data?.profile) {
-        if (supabase) {
-          try {
-            logAuthProfileEvent("profile-load-retry", {
-              userId: nextUser.id,
-              reason: "server-route-missed-or-failed",
-            });
-
-            const resolvedUser = await resolveClientSessionUser(supabase, nextUser);
-            const fallbackProfile = await ensureProfileForUser(supabase, resolvedUser);
-            setProfile(fallbackProfile);
-            setProfileError(null);
-
-            logAuthProfileEvent("final-profile-state", {
-              userId: nextUser.id,
-              source: "browser-fallback",
-              onboardingCompleted: fallbackProfile.onboardingCompleted,
-              journalPreset: fallbackProfile.journalPreset,
-              hasJournalConfig: Boolean(fallbackProfile.journalConfig),
-            });
-
-            return;
-          } catch (fallbackError) {
-            if (process.env.NODE_ENV === "development") {
-              console.error("[auth-provider]", "profile-load-failed", {
-                userId: nextUser.id,
-                status: result?.status ?? null,
-                data: result?.data ?? null,
-                fallbackError: serializeAuthError(fallbackError),
-              });
-            }
-          }
-        }
-
+      if (!result.ok || !result.data?.profile) {
         throw new Error(
-          result?.data?.error ?? "Your profile could not be loaded right now.",
+          result.data?.error ?? "Your profile could not be loaded right now.",
         );
       }
 
       setProfile(result.data.profile);
       setProfileError(null);
+
       logAuthProfileEvent("final-profile-state", {
         userId: nextUser.id,
-        source: "api",
         onboardingCompleted: result.data.profile.onboardingCompleted,
         journalPreset: result.data.profile.journalPreset,
         hasJournalConfig: Boolean(result.data.profile.journalConfig),
       });
-    } catch (caughtError) {
+    } catch (error) {
+      console.error("[auth-provider]", "profile-load-failed", {
+        userId: nextUser.id,
+        error: serializeAuthError(error),
+      });
       setProfile(null);
       setProfileError(
-        caughtError instanceof Error
-          ? caughtError.message
+        error instanceof Error
+          ? error.message
           : "Your profile could not be loaded right now.",
       );
     } finally {
       setIsProfileReady(true);
     }
-  }, [isConfigured, supabase]);
+  }, []);
 
   useEffect(() => {
-    if (!supabase) {
+    if (status === "loading") {
       return;
     }
 
-    let isActive = true;
-
-    void supabase.auth.getSession().then(({ data }) => {
-      if (!isActive) {
-        return;
-      }
-
-      const nextUser = data.session?.user ?? initialUser ?? null;
-      setSession(data.session);
-      setUser(nextUser);
-      setIsReady(true);
-      void hydrateProfile(nextUser);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      const nextUser = nextSession?.user ?? null;
-      setSession(nextSession);
-      setUser(nextUser);
-      setIsReady(true);
-      void hydrateProfile(nextUser);
-    });
-
-    return () => {
-      isActive = false;
-      subscription.unsubscribe();
-    };
-  }, [hydrateProfile, initialUser, supabase]);
+    void hydrateProfile(resolvedUser);
+  }, [hydrateProfile, resolvedUser, status]);
 
   const value = useMemo<AuthContextValue>(() => {
     return {
-      user,
-      session,
-      supabase,
-      isConfigured,
+      user: resolvedUser,
+      session: resolvedSession,
+      supabase: null,
+      isConfigured: true,
       isReady,
       profile,
       isProfileReady,
       profileError,
       async refreshProfile() {
-        await hydrateProfile(user);
+        await hydrateProfile(resolvedUser);
       },
       async saveProfile(input) {
-        if (!user) {
+        if (!resolvedUser) {
           return {
             profile: null,
             error: "You need to be logged in to save profile settings.",
@@ -333,71 +226,15 @@ export function AuthProvider({
 
         try {
           logAuthProfileEvent("profile-save-started", {
-            userId: user.id,
+            userId: resolvedUser.id,
             input,
           });
 
-          let result:
-            | Awaited<ReturnType<typeof requestProfile>>
-            | null = null;
+          const result = await requestProfile("PUT", input);
 
-          try {
-            result = await requestProfile("PUT", input);
-          } catch (requestError) {
-            if (process.env.NODE_ENV === "development") {
-              console.error("[auth-provider]", "profile-save-request-failed", {
-                userId: user.id,
-                message:
-                  requestError instanceof Error
-                    ? requestError.message
-                    : "Unknown profile save request failure.",
-              });
-            }
-          }
-
-          if (!result?.ok || !result.data?.profile) {
-            if (supabase) {
-              try {
-                logAuthProfileEvent("profile-save-retry", {
-                  userId: user.id,
-                  reason: "server-route-missed-or-failed",
-                });
-
-                const resolvedUser = await resolveClientSessionUser(supabase, user);
-                const fallbackProfile = await updateProfileForUser(
-                  supabase,
-                  resolvedUser,
-                  input,
-                );
-
-                setProfile(fallbackProfile);
-                setProfileError(null);
-                setIsProfileReady(true);
-
-                logAuthProfileEvent("profile-save-succeeded", {
-                  userId: user.id,
-                  source: "browser-fallback",
-                  profile: fallbackProfile,
-                });
-
-                return {
-                  profile: fallbackProfile,
-                  error: null,
-                };
-              } catch (fallbackError) {
-                if (process.env.NODE_ENV === "development") {
-                  console.error("[auth-provider]", "profile-save-failed", {
-                    userId: user.id,
-                    status: result?.status ?? null,
-                    data: result?.data ?? null,
-                    fallbackError: serializeAuthError(fallbackError),
-                  });
-                }
-              }
-            }
-
+          if (!result.ok || !result.data?.profile) {
             throw new Error(
-              result?.data?.error ?? "Your profile could not be saved right now.",
+              result.data?.error ?? "Your profile could not be saved right now.",
             );
           }
 
@@ -406,8 +243,7 @@ export function AuthProvider({
           setIsProfileReady(true);
 
           logAuthProfileEvent("profile-save-succeeded", {
-            userId: user.id,
-            source: "api",
+            userId: resolvedUser.id,
             profile: result.data.profile,
           });
 
@@ -415,10 +251,14 @@ export function AuthProvider({
             profile: result.data.profile,
             error: null,
           };
-        } catch (caughtError) {
+        } catch (error) {
+          console.error("[auth-provider]", "profile-save-failed", {
+            userId: resolvedUser.id,
+            error: serializeAuthError(error),
+          });
           const message =
-            caughtError instanceof Error
-              ? caughtError.message
+            error instanceof Error
+              ? error.message
               : "Your profile could not be saved right now.";
           setProfileError(message);
           return {
@@ -428,41 +268,60 @@ export function AuthProvider({
         }
       },
       async signOut() {
-        if (!supabase) {
-          return {
-            error:
-              "Supabase is not configured yet. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.",
-          };
-        }
+        try {
+          await nextAuthSignOut({
+            redirect: false,
+            callbackUrl: "/login",
+          });
 
-        const { error } = await supabase.auth.signOut();
-
-        if (!error) {
-          setSession(null);
-          setUser(null);
           setProfile(null);
           setProfileError(null);
           setIsProfileReady(true);
-        }
 
-        return {
-          error: error?.message ?? null,
-        };
+          return {
+            error: null,
+          };
+        } catch (error) {
+          console.error("[auth-provider]", "signout-failed", {
+            error: serializeAuthError(error),
+          });
+
+          return {
+            error:
+              error instanceof Error
+                ? error.message
+                : "You could not be logged out right now.",
+          };
+        }
       },
     };
   }, [
     hydrateProfile,
-    isConfigured,
     isProfileReady,
     isReady,
     profile,
     profileError,
-    session,
-    supabase,
-    user,
+    resolvedSession,
+    resolvedUser,
   ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function AuthProvider({
+  children,
+  initialUser,
+  initialSession,
+}: {
+  children: ReactNode;
+  initialUser: AuthenticatedUser | null;
+  initialSession: Session | null;
+}) {
+  return (
+    <SessionProvider session={initialSession} refetchOnWindowFocus={false}>
+      <AuthProviderInner initialUser={initialUser}>{children}</AuthProviderInner>
+    </SessionProvider>
+  );
 }
 
 export function useAuth() {

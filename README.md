@@ -1,16 +1,16 @@
 # jouwtdl
 
-jouwtdl is moving in careful phases from a purely local MVP toward a fully self-hosted multi-user product. The current runtime still relies on Supabase for authentication and the first migrated persistence flows, while phase 1 of the PostgreSQL migration adds Prisma, a self-hosted PostgreSQL connection, and a minimal database health-check foundation without rewriting the working app behavior yet.
+jouwtdl is moving in careful phases from a purely local MVP toward a fully self-hosted multi-user product. The active login, signup, session, and profile runtime now use Auth.js credentials auth + Prisma on self-hosted PostgreSQL, while older Supabase schema assets remain in the repo as legacy migration/reference material for later persistence phases.
 
 ## Stack
 
 - Next.js App Router
 - React + TypeScript
 - Tailwind CSS
-- Supabase Auth + Postgres + Row Level Security
-- Prisma + self-hosted PostgreSQL foundation
+- Auth.js / NextAuth credentials auth
+- Prisma + self-hosted PostgreSQL
 - Local storage persistence for not-yet-migrated planning/task flows
-- Modular services for planning, storage, transcription, Supabase journal persistence, and AI-style analysis
+- Modular services for planning, storage, transcription, profile persistence, and AI-style analysis
 
 ## Core Modules
 
@@ -29,26 +29,26 @@ app/                  Routes and page composition
 components/           Reusable UI blocks and forms
 data/                 Journal schema, default life areas, seed state
 hooks/                App state and voice transcription hooks
-lib/                  Date helpers, i18n, auth, and Supabase clients
+lib/                  Date helpers, i18n, auth, Prisma client, and legacy Supabase helpers
 providers/            Language, auth, app state, and journal voice providers
 prisma/               Prisma schema foundation for the self-hosted PostgreSQL migration
 prisma.config.ts      Prisma 7 datasource config for CLI commands
-services/             Planning, storage, Supabase journal persistence, and analysis logic
-supabase/             SQL schema and RLS setup
+services/             Planning, storage, auth/profile persistence, and analysis logic
+supabase/             Legacy SQL schema and RLS setup kept for later migration work
 types/                Shared domain models and database types
 ```
 
 ## Database Migration Direction
 
-- Supabase remains active for the current auth and migrated persistence flows.
-- Prisma is now added as the first self-hosted PostgreSQL layer.
-- The app does not yet read or write core product data through Prisma in this phase.
-- The first Prisma-backed endpoint is `/api/db-health`, which verifies that `DATABASE_URL` is reachable.
+- Auth.js credentials + Prisma now power the active auth and profile flow.
+- Prisma-backed PostgreSQL is the active source of truth for login, signup, session, and profile setup.
+- Legacy Supabase helpers remain in the codebase for later migration work, but auth no longer depends on Supabase.
+- `/api/db-health` verifies that `DATABASE_URL` is reachable.
 
 ## Current Persistence Split
 
-- `Journal` is now user-owned and persisted in Supabase.
-- `Planning`, `tasks`, and the rest of the app still use the existing local-first workspace state for this migration phase.
+- `Auth` and `profile/setup` are now stored in PostgreSQL through Prisma.
+- `Planning`, `tasks`, and `journal entry` state still keep their local-first fallback while the broader persistence migration continues.
 - Local storage remains in place so the product stays stable while the rest of the data model is migrated later.
 
 ## Journal Setup Per User
@@ -79,44 +79,26 @@ Voice input now records audio in the browser with `MediaRecorder`, uploads the f
 
 ## Journal Summaries
 
-When a journal entry is saved, the app first persists the raw section memos to Supabase and then calls `app/api/journal-summary/route.ts` to generate one combined AI summary for the full day.
+When a journal entry is saved, the app first persists the raw section memos to the current app persistence layer and then calls `app/api/journal-summary/route.ts` to generate one combined AI summary for the full day.
 
 - Raw journal content is saved even if summary generation fails
-- The summary is stored alongside the journal entry in Supabase
+- The summary is stored alongside the journal entry in the current journal record
 - The user can retry summary generation later from the journal UI
 - The same `OPENAI_API_KEY` is used for transcription and journal summaries
 - In development, the summary flow logs request building, API calls, raw model output, parsed summary text, and summary save results
 
 ## Authentication
 
-This phase adds basic Supabase email/password auth:
+The active auth flow now uses Auth.js credentials auth with Prisma-backed PostgreSQL:
 
 - `login`
 - `sign up`
-- session persistence
+- session persistence with cookies
 - logout
 - protected app routes
+- profile hydration through `/api/profile`
 
 Important for this Next.js version: route protection is implemented with `proxy.ts`, not `middleware.ts`, because the `middleware` file convention is deprecated in the current Next.js docs bundled in `node_modules/next/dist/docs/`.
-
-## Supabase Journal Flow
-
-The first fully migrated vertical slice is the journal:
-
-- one journal entry per `user + date`
-- per-section journal content stored separately
-- tomorrow setup stored separately
-- AI summary stored on the journal entry
-- journal history reloads from Supabase for the logged-in user
-- journal structure itself is stored per user on `profiles.journal_config`
-
-The key persistence pieces are:
-
-- `/Users/stanleyreddemann/Projecten/To-do-list-app/lib/supabase/client.ts`
-- `/Users/stanleyreddemann/Projecten/To-do-list-app/lib/supabase/server.ts`
-- `/Users/stanleyreddemann/Projecten/To-do-list-app/lib/supabase/proxy.ts`
-- `/Users/stanleyreddemann/Projecten/To-do-list-app/services/journal-persistence-service.ts`
-- `/Users/stanleyreddemann/Projecten/To-do-list-app/supabase/schema.sql`
 
 ## Languages
 
@@ -156,18 +138,14 @@ Create `.env.local` with:
 ```bash
 DATABASE_URL="postgresql://jouwtdl_user:Wewillenverdienen3!@localhost:5432/jouwtdl"
 AUTH_SECRET=your_auth_secret_here
-NEXTAUTH_URL=http://localhost:3000
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_or_publishable_key
+NEXTAUTH_URL=https://jouwtdl.nl
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_SUMMARY_MODEL=gpt-5-mini # optional
 ```
 
 You can start from `/Users/stanleyreddemann/Projecten/To-do-list-app/.env.example`.
 
-`NEXT_PUBLIC_SUPABASE_ANON_KEY` is the expected public client key for this repo. If your Supabase project already uses the newer publishable key naming, you can also set `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; the app supports that as a fallback.
-
-Without Supabase configuration, the auth flow will show a setup warning and the app falls back to the older local-only behavior where possible. Without `OPENAI_API_KEY`, server transcription and AI journal summaries will return a configuration error.
+No Supabase environment variables are required for the active login/signup/session/profile flow anymore. Without `OPENAI_API_KEY`, server transcription and AI journal summaries will return a configuration error.
 
 ### PostgreSQL + Prisma Setup
 
@@ -175,10 +153,15 @@ Without Supabase configuration, the auth flow will show a setup warning and the 
 2. Copy `/Users/stanleyreddemann/Projecten/To-do-list-app/.env.example` to `.env.local` and fill in the values you want to use.
 3. Run `npm install`.
 4. Run `npx prisma generate`.
-5. Start the app with `npm run dev`.
-6. Open [http://localhost:3000/api/db-health](http://localhost:3000/api/db-health) to verify Prisma can connect to PostgreSQL.
+5. Apply the Prisma SQL migration for credentials auth if your database does not have `profiles.password_hash` yet.
+6. Start the app with `npm run dev`.
+7. Open [http://localhost:3000/api/db-health](http://localhost:3000/api/db-health) to verify Prisma can connect to PostgreSQL.
 
-This phase does not replace Supabase yet. You still need the current Supabase environment variables for the working auth and journal runtime.
+The auth-related migration added in this phase is:
+
+- `/Users/stanleyreddemann/Projecten/To-do-list-app/prisma/migrations/20260517154500_add_profile_password_hash/migration.sql`
+
+This adds `profiles.password_hash` and a unique email index for the credentials login flow.
 
 Prisma 7 note:
 
@@ -186,20 +169,16 @@ Prisma 7 note:
 - runtime database access uses a PostgreSQL driver adapter from `@prisma/adapter-pg`
 - the app still imports Prisma through `/Users/stanleyreddemann/Projecten/To-do-list-app/lib/prisma.ts`
 
-### Supabase Setup
+### Legacy Supabase Reference
 
-1. Create a Supabase project.
-2. Copy the SQL from `/Users/stanleyreddemann/Projecten/To-do-list-app/supabase/schema.sql` into the Supabase SQL editor and run it.
-3. In Supabase Auth, enable email/password sign-in.
-4. Add the project URL and public key to `.env.local`.
-5. Run `npm run dev` and create an account at `/signup`.
+The SQL files in `/Users/stanleyreddemann/Projecten/To-do-list-app/supabase/` are kept as reference and migration history for older persistence work. They are no longer required for the active login/signup/session/profile flow.
 
-If your Supabase project already existed before the per-user journal setup fields were added, also run:
+If you are still referencing an older Supabase-backed schema for migration history, you may also want to keep these align scripts nearby:
 
 - `/Users/stanleyreddemann/Projecten/To-do-list-app/supabase/migrations/20260406_align_profiles_schema.sql`
 - `/Users/stanleyreddemann/Projecten/To-do-list-app/supabase/migrations/20260406_align_journal_schema.sql`
 
-For a fresh Supabase project, apply every SQL file in `/Users/stanleyreddemann/Projecten/To-do-list-app/supabase/migrations` in filename order after enabling email/password auth.
+For a fresh legacy Supabase reference environment, apply every SQL file in `/Users/stanleyreddemann/Projecten/To-do-list-app/supabase/migrations` in filename order after enabling email/password auth.
 
 The profile migration adds `onboarding_completed`, `journal_preset`, and `journal_config` to `public.profiles` if they are missing, restores the profile trigger from `auth.users`, and refreshes the PostgREST schema cache with `notify pgrst, 'reload schema';`.
 
@@ -233,5 +212,5 @@ npm run start
 - The journal now renders from each user’s saved config. Trading remains the safe fallback preset for older profiles that do not have a `journal_config` yet.
 - Existing journal entries remain readable even if a user later renames, disables, or reorders sections, because journal content is still stored generically as `section_key + content`.
 - The UI is intentionally quiet and spacious rather than dashboard-heavy.
-- This migration phase uses Supabase only for authentication and journals. Planning/task/dashboard persistence is intentionally still local-first for now.
+- Planning/task/dashboard persistence is intentionally still local-first for now while the broader PostgreSQL migration continues.
 - Voice transcription is tested around Chrome-style `MediaRecorder` support first. If a browser cannot record audio reliably, the journal still supports normal typing.

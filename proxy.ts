@@ -1,37 +1,31 @@
-import { NextResponse, type NextRequest } from "next/server";
-
-import { updateSession } from "@/lib/supabase/proxy";
-import { isProtectedPath } from "@/lib/auth";
-import { isSupabaseConfigured } from "@/lib/supabase/shared";
+import { withAuth } from "next-auth/middleware";
+import { NextResponse } from "next/server";
 
 const authPages = new Set(["/login", "/signup"]);
 
-export async function proxy(request: NextRequest) {
-  if (!isSupabaseConfigured()) {
-    return NextResponse.next();
-  }
-
-  const { response, claims } = await updateSession(request);
-  const pathname = request.nextUrl.pathname;
-  const isAuthenticated = Boolean(claims?.sub);
-
-  if (!isAuthenticated && isProtectedPath(pathname)) {
-    const loginUrl = new URL("/login", request.url);
-    const nextValue = `${pathname}${request.nextUrl.search}`;
-
-    if (nextValue !== "/") {
-      loginUrl.searchParams.set("next", nextValue);
+export default withAuth(
+  function proxy(request) {
+    if (authPages.has(request.nextUrl.pathname) && request.nextauth.token) {
+      return NextResponse.redirect(new URL("/", request.url));
     }
 
-    return NextResponse.redirect(loginUrl);
-  }
+    return NextResponse.next();
+  },
+  {
+    pages: {
+      signIn: "/login",
+    },
+    callbacks: {
+      authorized: ({ req, token }) => {
+        if (authPages.has(req.nextUrl.pathname)) {
+          return true;
+        }
 
-  if (isAuthenticated && authPages.has(pathname)) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
-
-  return response;
-}
+        return Boolean(token);
+      },
+    },
+  },
+);
 
 export const config = {
   matcher: [

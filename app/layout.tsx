@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { AppShell } from "@/components/app-shell";
-import { getCurrentUser } from "@/lib/auth";
+import { getAuthSession, getCurrentUser } from "@/lib/auth";
 import { getThemeInitScript } from "@/lib/theme";
 import { AppProvider } from "@/providers/app-provider";
 import { AuthProvider } from "@/providers/auth-provider";
@@ -39,6 +39,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getAuthSession();
   const user = await getCurrentUser();
 
   return (
@@ -53,7 +54,7 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: getThemeInitScript() }} />
         <ThemeProvider>
           <LanguageProvider>
-            <AuthProvider initialUser={user}>
+            <AuthProvider initialSession={session} initialUser={user}>
               <AppProvider>
                 <AppShell>{children}</AppShell>
               </AppProvider>

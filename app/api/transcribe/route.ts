@@ -1,7 +1,6 @@
 import OpenAI from "openai";
 
-import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/supabase/shared";
+import { getCurrentUser } from "@/lib/auth";
 
 const TRANSCRIPTION_MODEL = "gpt-4o-transcribe";
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
@@ -19,20 +18,15 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (isSupabaseConfigured()) {
-      const supabase = await createSupabaseServerClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
-      if (!user) {
-        return Response.json(
-          {
-            error: "You need to log in before using voice transcription.",
-          },
-          { status: 401 },
-        );
-      }
+    if (!user) {
+      return Response.json(
+        {
+          error: "You need to log in before using voice transcription.",
+        },
+        { status: 401 },
+      );
     }
 
     const formData = await request.formData();

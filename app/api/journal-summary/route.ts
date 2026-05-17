@@ -9,9 +9,8 @@ import {
   getEnabledJournalConfigSections,
   normalizeJournalConfig,
 } from "@/lib/journal-config";
+import { getCurrentUser } from "@/lib/auth";
 import { normalizeLanguage, type AppLanguage } from "@/lib/i18n";
-import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/supabase/shared";
 import type { JournalConfig, JournalSections, TomorrowSetup } from "@/types";
 
 const SUMMARY_MODEL = process.env.OPENAI_SUMMARY_MODEL || "gpt-5-mini";
@@ -61,20 +60,15 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (isSupabaseConfigured()) {
-      const supabase = await createSupabaseServerClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
-      if (!user) {
-        return Response.json(
-          {
-            error: "You need to log in before generating a journal summary.",
-          },
-          { status: 401 },
-        );
-      }
+    if (!user) {
+      return Response.json(
+        {
+          error: "You need to log in before generating a journal summary.",
+        },
+        { status: 401 },
+      );
     }
 
     const body = (await request.json()) as {
