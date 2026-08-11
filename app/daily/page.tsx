@@ -8,10 +8,8 @@ import { DailyTaskForm } from "@/components/planner-forms";
 import { PageHeader } from "@/components/page-header";
 import { ProgressCard } from "@/components/progress-card";
 import { TaskList } from "@/components/task-list";
-import { TodayFocusCard } from "@/components/today-focus-card";
 import { useAppState } from "@/hooks/use-app-state";
 import { useLanguage } from "@/hooks/use-language";
-import { generateTodaySuggestion } from "@/services/analysis-service";
 import { formatLongDate, shiftDate, toDateKey } from "@/lib/date";
 import { getDailyProgress, getTasksForDate } from "@/services/planning-service";
 
@@ -24,7 +22,6 @@ export default function DailyPage() {
     deleteDailyTask,
     updateDailyTask,
     toggleTask,
-    setDailyFocus,
     rescheduleTask,
     splitTask,
     convertTaskToWeeklyGoal,
@@ -36,8 +33,6 @@ export default function DailyPage() {
   const effectiveSelectedDate =
     selectedDate || (isHydrated ? toDateKey(new Date()) : "");
 
-  const todaySuggestion = generateTodaySuggestion(state, effectiveSelectedDate, language);
-  const focus = state.dailyFocuses.find((item) => item.date === effectiveSelectedDate);
   const tasks = getTasksForDate(state.dailyTasks, effectiveSelectedDate);
   const overdueCarryOver = state.dailyTasks.filter(
     (task) =>
@@ -58,13 +53,11 @@ export default function DailyPage() {
           title={t("planning.dayPage.title")}
           description={t("planning.dayPage.loading")}
         />
-        <section className="app-surface-strong app-panel-lg">
-          <p className="app-label">{t("focus.label")}</p>
-          <div className="mt-4 h-10 w-2/3 rounded-2xl bg-[color:var(--surface-soft)]" />
+        <section className="grid gap-4 sm:grid-cols-2">
+          <div className="app-surface app-panel h-24" />
+          <div className="app-surface app-panel h-24" />
         </section>
-        <section className="app-surface app-panel">
-          <div className="h-20 rounded-[18px] bg-[color:var(--surface-soft)]" />
-        </section>
+        <section className="app-surface app-panel h-40" />
       </div>
     );
   }
@@ -109,22 +102,12 @@ export default function DailyPage() {
         }
       />
 
-      <TodayFocusCard
-        key={`${effectiveSelectedDate}-${focus?.id ?? "new"}`}
-        focus={focus}
-        aiSuggestion={todaySuggestion.title}
-        onSave={(mainFocus, secondaryFocuses) =>
-          setDailyFocus({ date: effectiveSelectedDate, mainFocus, secondaryFocuses })
-        }
-      />
-
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <ProgressCard label={t("planning.dayPage.done")} value={getDailyProgress(tasks)} />
         <ProgressCard
           value={Math.min(overdueCarryOver.length * 20, 100)}
           label={t("planning.dayPage.carryOver")}
         />
-        <ProgressCard label={t("planning.dayPage.focus")} value={focus?.mainFocus ? 100 : 0} />
       </div>
 
       {showTaskForm ? (

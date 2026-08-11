@@ -56,19 +56,27 @@ const OTHER_OPTION_VALUE = "";
 export function MonthlyGoalForm({
   initialValue,
   lifeAreas,
+  defaultMonth,
+  defaultYear,
   onSubmit,
   onCancel,
 }: {
   initialValue?: MonthlyGoal;
   lifeAreas: string[];
+  defaultMonth?: number;
+  defaultYear?: number;
   onSubmit: (value: MonthlyGoalInput) => void;
   onCancel?: () => void;
 }) {
   const { t, language } = useLanguage();
   const [title, setTitle] = useState(initialValue?.title ?? "");
   const [description, setDescription] = useState(initialValue?.description ?? "");
-  const [month, setMonth] = useState(initialValue?.month ?? new Date().getMonth() + 1);
-  const [year, setYear] = useState(initialValue?.year ?? new Date().getFullYear());
+  const [month, setMonth] = useState(
+    initialValue?.month ?? defaultMonth ?? new Date().getMonth() + 1,
+  );
+  const [year, setYear] = useState(
+    initialValue?.year ?? defaultYear ?? new Date().getFullYear(),
+  );
   const [lifeArea, setLifeArea] = useState(initialValue?.lifeArea ?? lifeAreas[0] ?? "trading");
   const [status, setStatus] = useState<GoalStatus>(initialValue?.status ?? "not_started");
   const [dueDate, setDueDate] = useState(initialValue?.dueDate ?? "");
@@ -182,12 +190,16 @@ export function WeeklyGoalForm({
   initialValue,
   monthlyGoals,
   lifeAreas,
+  defaultStartDate,
+  defaultEndDate,
   onSubmit,
   onCancel,
 }: {
   initialValue?: WeeklyGoal;
   monthlyGoals: MonthlyGoal[];
   lifeAreas: string[];
+  defaultStartDate?: string;
+  defaultEndDate?: string;
   onSubmit: (value: WeeklyGoalInput) => void;
   onCancel?: () => void;
 }) {
@@ -198,8 +210,12 @@ export function WeeklyGoalForm({
   );
   const [title, setTitle] = useState(initialValue?.title ?? "");
   const [description, setDescription] = useState(initialValue?.description ?? "");
-  const [startDate, setStartDate] = useState(initialValue?.startDate ?? currentWeek.startKey);
-  const [endDate, setEndDate] = useState(initialValue?.endDate ?? currentWeek.endKey);
+  const [startDate, setStartDate] = useState(
+    initialValue?.startDate ?? defaultStartDate ?? currentWeek.startKey,
+  );
+  const [endDate, setEndDate] = useState(
+    initialValue?.endDate ?? defaultEndDate ?? currentWeek.endKey,
+  );
   const [lifeArea, setLifeArea] = useState(initialValue?.lifeArea ?? lifeAreas[0] ?? "trading");
   const [status, setStatus] = useState<GoalStatus>(initialValue?.status ?? "not_started");
 

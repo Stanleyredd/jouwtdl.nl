@@ -38,6 +38,15 @@ export function formatMonthLabel(
   });
 }
 
+export function getMonthKey(month: number, year: number) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+export function getMonthKeyForDate(date: Date | string) {
+  const safeDate = typeof date === "string" ? parseISO(date) : date;
+  return format(safeDate, "yyyy-MM");
+}
+
 export function getWeekRange(date: Date | string, language: AppLanguage = "en") {
   const safeDate = typeof date === "string" ? parseISO(date) : date;
   const start = startOfWeek(safeDate, { weekStartsOn: 1 });
@@ -51,6 +60,33 @@ export function getWeekRange(date: Date | string, language: AppLanguage = "en") 
     startKey: toDateKey(start),
     endKey: toDateKey(end),
   };
+}
+
+export function formatWeekSpan(
+  startDate: Date | string,
+  endDate: Date | string,
+  language: AppLanguage = "en",
+) {
+  const start = typeof startDate === "string" ? parseISO(startDate) : startDate;
+  const end = typeof endDate === "string" ? parseISO(endDate) : endDate;
+  const locale = getDateLocale(language);
+  const sameMonth = format(start, "yyyy-MM") === format(end, "yyyy-MM");
+  const sameYear = format(start, "yyyy") === format(end, "yyyy");
+
+  if (sameMonth) {
+    return `${format(start, "d", { locale })}-${format(end, "d MMMM", { locale })}`;
+  }
+
+  if (sameYear) {
+    return `${format(start, "d MMMM", { locale })}-${format(end, "d MMMM", { locale })}`;
+  }
+
+  return `${format(start, "d MMM yyyy", { locale })}-${format(end, "d MMM yyyy", { locale })}`;
+}
+
+export function formatWeekHeading(date: Date | string, language: AppLanguage = "en") {
+  const week = getWeekRange(date, language);
+  return `Week ${week.weekNumber} · ${formatWeekSpan(week.start, week.end, language)}`;
 }
 
 export function getMonthRange(date: Date | string, language: AppLanguage = "en") {
