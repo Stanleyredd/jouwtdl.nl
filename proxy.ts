@@ -2,11 +2,12 @@ import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
 const authPages = new Set(["/login", "/signup"]);
+const authenticatedHomePath = "/dashboard";
 
 export default withAuth(
   function proxy(request) {
     if (authPages.has(request.nextUrl.pathname) && request.nextauth.token) {
-      return NextResponse.redirect(new URL("/", request.url));
+      return NextResponse.redirect(new URL(authenticatedHomePath, request.url));
     }
 
     return NextResponse.next();

@@ -8,6 +8,30 @@ import { useState, type FormEvent } from "react";
 import { useLanguage } from "@/hooks/use-language";
 import { translateRuntimeMessage } from "@/lib/i18n";
 
+const DEFAULT_AUTH_REDIRECT_PATH = "/dashboard";
+
+function resolveNextPath(rawPath: string | null) {
+  if (!rawPath) {
+    return DEFAULT_AUTH_REDIRECT_PATH;
+  }
+
+  if (rawPath.startsWith("/") && !rawPath.startsWith("//")) {
+    return rawPath;
+  }
+
+  try {
+    const parsed = new URL(rawPath);
+
+    if (parsed.pathname.startsWith("/")) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+  } catch {
+    return DEFAULT_AUTH_REDIRECT_PATH;
+  }
+
+  return DEFAULT_AUTH_REDIRECT_PATH;
+}
+
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -19,12 +43,13 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   );
   const [message, setMessage] = useState("");
 
-  const nextPath =
-    searchParams.get("next") || searchParams.get("callbackUrl") || "/";
+  const nextPath = resolveNextPath(
+    searchParams.get("next") || searchParams.get("callbackUrl"),
+  );
   const isLogin = mode === "login";
   const accountCreated = searchParams.get("created") === "1";
   const authSwitchHref = `${isLogin ? "/signup" : "/login"}${
-    nextPath !== "/" ? `?next=${encodeURIComponent(nextPath)}` : ""
+    nextPath !== DEFAULT_AUTH_REDIRECT_PATH ? `?next=${encodeURIComponent(nextPath)}` : ""
   }`;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -36,11 +61,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     try {
       const normalizedEmail = email.trim().toLowerCase();
 
-      if (isLogin) {
-        const result = await signIn("credentials", {
-          email: normalizedEmail,
-          password,
-          redirect: false,
+        if (isLogin) {
+          const result = await signIn("credentials", {
+            email: normalizedEmail,
+            password,
+            redirect: false,
           callbackUrl: nextPath,
         });
 
@@ -54,8 +79,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
         setStatus("success");
         setMessage(t("auth.loginSuccess"));
-        router.replace(result.url ?? nextPath);
-        router.refresh();
+        window.location.replace(nextPath);
         return;
       }
 
@@ -86,7 +110,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       setStatus("success");
       setMessage(data?.message ?? t("auth.signupSuccess"));
       router.replace(
-        `/login?created=1${nextPath !== "/" ? `&next=${encodeURIComponent(nextPath)}` : ""}`,
+        `/login?created=1${
+          nextPath !== DEFAULT_AUTH_REDIRECT_PATH
+            ? `&next=${encodeURIComponent(nextPath)}`
+            : ""
+        }`,
       );
       router.refresh();
     } catch (caughtError) {
