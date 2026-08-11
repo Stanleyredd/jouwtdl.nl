@@ -23,11 +23,21 @@ import {
   updateJournalSummaryForUser,
 } from "@/services/journal-persistence-service";
 import {
-  listPlanningStateForUser,
+  createMonthlyGoal as createMonthlyGoalRequest,
+  deleteMonthlyGoalById,
+  listMonthlyGoals,
+  updateMonthlyGoalById,
+} from "@/services/monthly-goal-api-service";
+import {
   savePlanningStateForUser,
 } from "@/services/planning-persistence-service";
 import { recalculateAppState } from "@/services/planning-service";
-import { loadAppState, saveAppState } from "@/services/storage-service";
+import {
+  hasCompletedMonthlyGoalsDatabaseMigration,
+  loadAppState,
+  markMonthlyGoalsDatabaseMigrationComplete,
+  saveAppState,
+} from "@/services/storage-service";
 import type {
   AppState,
   DailyFocus,
@@ -173,6 +183,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const planningRequestIdRef = useRef(0);
   const planningSyncTimeoutRef = useRef<number | null>(null);
   const hasPlanningBaselineRef = useRef(false);
+  const latestStateRef = useRef(state);
+
+  useEffect(() => {
+    latestStateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     if (isConfigured && !isAuthReady) {
@@ -227,7 +242,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     planningRequestIdRef.current += 1;
     const requestId = planningRequestIdRef.current;
 
-    if (!user || !supabase) {
+    if (!user) {
       setPlanningError(null);
       setPlanningStatus("ready");
       hasPlanningBaselineRef.current = true;
@@ -238,18 +253,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPlanningError(null);
     hasPlanningBaselineRef.current = false;
 
-    void listPlanningStateForUser(supabase, user.id)
-      .then((planningState) => {
+    void listMonthlyGoals()
+      .then(async (remoteMonthlyGoals) => {
         if (planningRequestIdRef.current !== requestId) {
           return;
         }
 
-        setState((currentState) =>
-          recalculateAppState({
-            ...currentState,
-            ...planningState,
-          }),
-        );
+        let canonicalMonthlyGoals = remoteMonthlyGoals;
+
+        if (!hasCompletedMonthlyGoalsDatabaseMigration(storageScope)) {
+          const localMonthlyGoals = latestStateRef.current.monthlyGoals;
+          const existingGoalIds = new Set(remoteMonthlyGoals.map((goal) => goal.id));
+          const missingLocalGoals = localMonthlyGoals.filter(
+            (goal) => !existingGoalIds.has(goal.id),
+          );
+
+          if (missingLocalGoals.length > 0) {
+            for (const localGoal of missingLocalGoals) {
+              await createMonthlyGoalRequest({
+                id: localGoal.id,
+                title: localGoal.title,
+                description: localGoal.description,
+                month: localGoal.month,
+                year: localGoal.year,
+                lifeArea: localGoal.lifeArea,
+                status: localGoal.status,
+                progress: localGoal.progress,
+                dueDate: localGoal.dueDate,
+                createdAt: localGoal.createdAt,
+              });
+            }
+
+            if (planningRequestIdRef.current !== requestId) {
+              return;
+            }
+
+            canonicalMonthlyGoals = await listMonthlyGoals();
+          }
+
+          markMonthlyGoalsDatabaseMigrationComplete(storageScope);
+        }
+
+        const nextState = recalculateAppState({
+          ...latestStateRef.current,
+          monthlyGoals: canonicalMonthlyGoals,
+        });
+
+        latestStateRef.current = nextState;
+        setState(nextState);
         setPlanningStatus("ready");
         setPlanningError(null);
         hasPlanningBaselineRef.current = true;
@@ -267,7 +318,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         );
         hasPlanningBaselineRef.current = true;
       });
-  }, [hydratedScope, isAuthReady, isConfigured, isHydrated, storageScope, supabase, user]);
+  }, [hydratedScope, isAuthReady, isConfigured, isHydrated, storageScope, user]);
 
   useEffect(() => {
     if (planningSyncTimeoutRef.current) {
@@ -404,7 +455,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   ]);
 
   const commit = useCallback((updater: (currentState: AppState) => AppState) => {
-    setState((currentState) => recalculateAppState(updater(currentState)));
+    const nextState = recalculateAppState(updater(latestStateRef.current));
+    latestStateRef.current = nextState;
+    setState(nextState);
+    return nextState;
   }, []);
 
   const value = useMemo<AppContextValue>(() => {
@@ -419,13 +473,84 @@ export function AppProvider({ children }: { children: ReactNode }) {
       planningError,
       journalError,
       addMonthlyGoal(input) {
-        commit((currentState) => ({
+        if (!user) {
+          commit((currentState) => ({
+            ...currentState,
+            monthlyGoals: [...currentState.monthlyGoals, buildMonthlyGoal(input)],
+          }));
+          return;
+        }
+
+        const optimisticGoal = buildMonthlyGoal(input);
+        const optimisticState = commit((currentState) => ({
           ...currentState,
-          monthlyGoals: [...currentState.monthlyGoals, buildMonthlyGoal(input)],
+          monthlyGoals: [...currentState.monthlyGoals, optimisticGoal],
         }));
+        const normalizedGoal =
+          optimisticState.monthlyGoals.find((goal) => goal.id === optimisticGoal.id) ??
+          optimisticGoal;
+
+        void createMonthlyGoalRequest({
+          id: normalizedGoal.id,
+          title: normalizedGoal.title,
+          description: normalizedGoal.description,
+          month: normalizedGoal.month,
+          year: normalizedGoal.year,
+          lifeArea: normalizedGoal.lifeArea,
+          status: normalizedGoal.status,
+          progress: normalizedGoal.progress,
+          dueDate: normalizedGoal.dueDate,
+          createdAt: optimisticGoal.createdAt,
+        })
+          .then((savedGoal) => {
+            commit((currentState) => ({
+              ...currentState,
+              monthlyGoals: currentState.monthlyGoals.some(
+                (goal) => goal.id === savedGoal.id,
+              )
+                ? currentState.monthlyGoals.map((goal) =>
+                    goal.id === savedGoal.id ? savedGoal : goal,
+                  )
+                : [...currentState.monthlyGoals, savedGoal],
+            }));
+            setPlanningError(null);
+          })
+          .catch((caughtError) => {
+            commit((currentState) => ({
+              ...currentState,
+              monthlyGoals: currentState.monthlyGoals.filter(
+                (goal) => goal.id !== optimisticGoal.id,
+              ),
+            }));
+            setPlanningError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Monthly goal could not be saved right now.",
+            );
+          });
       },
       updateMonthlyGoal(id, updates) {
-        commit((currentState) => ({
+        const previousGoal = latestStateRef.current.monthlyGoals.find(
+          (goal) => goal.id === id,
+        );
+
+        if (!previousGoal) {
+          return;
+        }
+
+        if (!user) {
+          commit((currentState) => ({
+            ...currentState,
+            monthlyGoals: currentState.monthlyGoals.map((goal) =>
+              goal.id === id
+                ? { ...goal, ...updates, updatedAt: new Date().toISOString() }
+                : goal,
+            ),
+          }));
+          return;
+        }
+
+        const optimisticState = commit((currentState) => ({
           ...currentState,
           monthlyGoals: currentState.monthlyGoals.map((goal) =>
             goal.id === id
@@ -433,8 +558,55 @@ export function AppProvider({ children }: { children: ReactNode }) {
               : goal,
           ),
         }));
+        const normalizedGoal = optimisticState.monthlyGoals.find(
+          (goal) => goal.id === id,
+        );
+
+        if (!normalizedGoal) {
+          return;
+        }
+
+        void updateMonthlyGoalById(id, {
+          title: normalizedGoal.title,
+          description: normalizedGoal.description,
+          month: normalizedGoal.month,
+          year: normalizedGoal.year,
+          lifeArea: normalizedGoal.lifeArea,
+          status: normalizedGoal.status,
+          progress: normalizedGoal.progress,
+          dueDate: normalizedGoal.dueDate,
+        })
+          .then((savedGoal) => {
+            commit((currentState) => ({
+              ...currentState,
+              monthlyGoals: currentState.monthlyGoals.map((goal) =>
+                goal.id === savedGoal.id ? savedGoal : goal,
+              ),
+            }));
+            setPlanningError(null);
+          })
+          .catch((caughtError) => {
+            commit((currentState) => ({
+              ...currentState,
+              monthlyGoals: currentState.monthlyGoals.map((goal) =>
+                goal.id === id ? previousGoal : goal,
+              ),
+            }));
+            setPlanningError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Monthly goal could not be saved right now.",
+            );
+          });
       },
       deleteMonthlyGoal(id) {
+        const previousMonthlyGoals = latestStateRef.current.monthlyGoals;
+        const previousWeeklyGoals = latestStateRef.current.weeklyGoals;
+
+        if (!previousMonthlyGoals.some((goal) => goal.id === id)) {
+          return;
+        }
+
         commit((currentState) => ({
           ...currentState,
           monthlyGoals: currentState.monthlyGoals.filter((goal) => goal.id !== id),
@@ -448,6 +620,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
               : goal,
           ),
         }));
+
+        if (!user) {
+          return;
+        }
+
+        void deleteMonthlyGoalById(id)
+          .then(() => {
+            setPlanningError(null);
+          })
+          .catch((caughtError) => {
+            commit((currentState) => ({
+              ...currentState,
+              monthlyGoals: previousMonthlyGoals,
+              weeklyGoals: previousWeeklyGoals,
+            }));
+            setPlanningError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Monthly goal could not be deleted right now.",
+            );
+          });
       },
       addWeeklyGoal(input) {
         commit((currentState) => ({

@@ -4,9 +4,14 @@ import type { AppState } from "@/types";
 
 const STORAGE_PREFIX = "clarity-system::state";
 const CURRENT_VERSION = 1;
+const MONTHLY_GOALS_DATABASE_MIGRATION_KEY = "monthly-goals-db-v1";
 
 function getStorageKey(scope: string) {
   return `${STORAGE_PREFIX}::${scope}`;
+}
+
+function getMonthlyGoalsMigrationKey(scope: string) {
+  return `${getStorageKey(scope)}::${MONTHLY_GOALS_DATABASE_MIGRATION_KEY}`;
 }
 
 function createLocalBaselineState(useSeedData: boolean) {
@@ -98,6 +103,22 @@ export function saveAppState(
   } catch {
     return "Local data could not be saved. Check browser storage settings and try again.";
   }
+}
+
+export function hasCompletedMonthlyGoalsDatabaseMigration(scope: string) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(getMonthlyGoalsMigrationKey(scope)) === "true";
+}
+
+export function markMonthlyGoalsDatabaseMigrationComplete(scope: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(getMonthlyGoalsMigrationKey(scope), "true");
 }
 
 function normalizeLoadedState(state: AppState): AppState {
