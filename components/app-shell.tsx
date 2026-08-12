@@ -176,50 +176,56 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden">
             <div className="sticky top-0 z-20 bg-[color:var(--shell-backdrop)] px-1 pb-3 pt-3 backdrop-blur lg:hidden">
               <div className="mx-auto w-full max-w-[960px] space-y-3">
-                <div className="relative px-3 pt-1">
-                  <Link href="/" className="mx-auto flex w-fit flex-col items-center gap-2 text-center">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-[18px] border border-[color:var(--border)] bg-[color:var(--surface-overlay)] shadow-[var(--shadow-soft)]">
-                      <Image
-                        src="/brand/jouwtdl-mono.svg"
-                        alt="JouwTDL logo"
-                        width={56}
-                        height={56}
-                        className="h-10 w-10 rounded-[12px]"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[2rem] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
-                        {t("app.name")}
-                      </p>
-                      <p className="text-[0.95rem] text-[color:var(--muted)]">{t("app.tagline")}</p>
-                    </div>
-                  </Link>
+                <div className="app-surface-strong app-panel-lg overflow-hidden rounded-[32px]">
+                  <div className="relative px-3 pt-1">
+                    <Link href="/" className="mx-auto flex w-fit flex-col items-center gap-3 text-center">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-[20px] border border-[color:var(--border)] bg-[color:var(--surface-soft)] shadow-[var(--shadow-soft)]">
+                        <Image
+                          src="/brand/jouwtdl-mono.svg"
+                          alt="JouwTDL logo"
+                          width={64}
+                          height={64}
+                          className="h-11 w-11 rounded-[14px]"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <p className="text-[2rem] font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
+                          {t("app.name")}
+                        </p>
+                        <p className="text-[0.95rem] text-[color:var(--muted)]">
+                          {t("app.tagline")}
+                        </p>
+                      </div>
+                    </Link>
 
-                  <button
-                    type="button"
-                    onClick={() => setIsMobileMenuOpen((open) => !open)}
-                    className="app-icon-button absolute right-3 top-3 h-11 w-11"
-                    aria-expanded={isMobileMenuOpen}
-                    aria-label={
-                      isMobileMenuOpen
-                        ? language === "nl"
-                          ? "Menu sluiten"
-                          : "Close menu"
-                        : language === "nl"
-                          ? "Menu openen"
-                          : "Open menu"
-                    }
-                  >
-                    {isMobileMenuOpen ? (
-                      <X className="h-4.5 w-4.5" strokeWidth={1.9} />
-                    ) : (
-                      <Menu className="h-4.5 w-4.5" strokeWidth={1.9} />
-                    )}
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileMenuOpen((open) => !open)}
+                      className="app-icon-button absolute right-0 top-0 h-11 w-11"
+                      aria-expanded={isMobileMenuOpen}
+                      aria-label={
+                        isMobileMenuOpen
+                          ? language === "nl"
+                            ? "Menu sluiten"
+                            : "Close menu"
+                          : language === "nl"
+                            ? "Menu openen"
+                            : "Open menu"
+                      }
+                    >
+                      {isMobileMenuOpen ? (
+                        <X className="h-4.5 w-4.5" strokeWidth={1.9} />
+                      ) : (
+                        <Menu className="h-4.5 w-4.5" strokeWidth={1.9} />
+                      )}
+                    </button>
+                  </div>
 
-                <div className="app-surface rounded-[28px] p-2.5 shadow-[var(--shadow-soft)]">
-                  <TopNavigation mobile />
+                  <div className="mt-5 border-t border-[color:var(--border)] pt-5">
+                    <div className="app-surface-soft rounded-[24px] px-3 py-3">
+                      <TopNavigation mobile />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -6,7 +6,7 @@ type TranslationDictionary = Record<string, string>;
 
 const dictionaries: Record<AppLanguage, TranslationDictionary> = {
   nl: {
-    "app.name": "jouwtdl",
+    "app.name": "JouwTDL",
     "app.tagline": "Plan. Doe. Reflecteer.",
     "common.loading": "Laden...",
     "common.save": "Opslaan",
@@ -315,7 +315,7 @@ const dictionaries: Record<AppLanguage, TranslationDictionary> = {
     "carryOver.lowerPriority": "Lagere prioriteit",
   },
   en: {
-    "app.name": "jouwtdl",
+    "app.name": "JouwTDL",
     "app.tagline": "Plan. Do. Reflect.",
     "common.loading": "Loading...",
     "common.save": "Save",
