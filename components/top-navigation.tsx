@@ -60,7 +60,7 @@ export function TopNavigation({ mobile = false }: { mobile?: boolean }) {
       className={cn(
         "flex gap-1.5",
         mobile
-          ? "overflow-x-auto px-3 pb-1"
+          ? "overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           : "flex-col rounded-[24px] border border-[color:var(--border)] bg-[color:var(--surface-overlay)] p-2.5 shadow-[var(--shadow-soft)]",
       )}
     >

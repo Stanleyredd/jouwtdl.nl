@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MoonStar } from "lucide-react";
+import { LogOut, Menu, MoonStar, Settings2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Footer } from "@/components/footer";
@@ -30,6 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   } = useAuth();
   const { t, language } = useLanguage();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isAuthPage = pathname === "/login" || pathname === "/signup";
   const isSetupPage = pathname === "/setup";
   const interfaceReady = isHydrated && isPlanningReady && (!user || isProfileReady);
@@ -58,6 +59,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router,
     user,
   ]);
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -169,8 +174,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="flex min-h-screen min-w-0 flex-1 flex-col">
             <div className="sticky top-0 z-20 border-b border-[color:var(--border)] bg-[color:var(--shell-backdrop)] px-1 py-3 backdrop-blur lg:hidden">
-              <div className="mb-3 flex items-center justify-between px-3">
-                <div className="flex items-center gap-3">
+              <div className="relative flex items-center justify-center px-3 py-1">
+                <Link href="/" className="inline-flex items-center gap-3 text-center">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]">
                     <MoonStar className="h-4.5 w-4.5" />
                   </div>
@@ -180,52 +185,84 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     </p>
                     <p className="text-xs text-[color:var(--muted)]">{t("app.tagline")}</p>
                   </div>
-                </div>
-                {!isHydrated ? (
-                  <span className="text-xs text-[color:var(--muted)]">
-                    {t("common.loading")}
-                  </span>
-                ) : null}
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileMenuOpen((open) => !open)}
+                  className="app-icon-button absolute right-3 top-1/2 h-10 w-10 -translate-y-1/2"
+                  aria-expanded={isMobileMenuOpen}
+                  aria-label={
+                    isMobileMenuOpen
+                      ? language === "nl"
+                        ? "Menu sluiten"
+                        : "Close menu"
+                      : language === "nl"
+                        ? "Menu openen"
+                        : "Open menu"
+                  }
+                >
+                  {isMobileMenuOpen ? (
+                    <X className="h-4.5 w-4.5" strokeWidth={1.9} />
+                  ) : (
+                    <Menu className="h-4.5 w-4.5" strokeWidth={1.9} />
+                  )}
+                </button>
               </div>
-              <div className="mb-3 px-3">
-                <div className="flex flex-col gap-2">
-                  <LanguageToggle />
-                  <ThemeToggle />
-                </div>
-              </div>
-              <div className="mb-3 px-3">
-                <div className="app-surface app-panel px-4 py-3 text-sm">
-                  <p className="font-medium text-[color:var(--foreground)]">
-                    {user?.email ?? t("auth.notLoggedIn")}
-                  </p>
-                  <p className="mt-1 text-xs text-[color:var(--muted)]">
-                    {user ? t("auth.loggedIn") : t("auth.loggedOut")}
-                  </p>
-                  {user ? (
-                    <div className="mt-3 flex flex-wrap gap-3 text-sm font-medium">
-                      {!isSetupPage ? (
-                        <Link href="/settings/journal" className="text-[color:var(--foreground)]">
-                          {t("settings.journalLink")}
-                        </Link>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => void handleLogout()}
-                        disabled={isLoggingOut}
-                        className="text-[color:var(--foreground)]"
-                      >
-                        {isLoggingOut ? t("auth.loggingOut") : t("auth.logout")}
-                      </button>
+              {isMobileMenuOpen ? (
+                <div className="px-3 pb-3 pt-3">
+                  <div className="app-surface app-panel ml-auto max-w-[340px] space-y-3 px-4 py-4">
+                    <div className="grid gap-2">
+                      <LanguageToggle className="app-toggle-button-compact !w-full !justify-start !text-[color:var(--foreground)]" />
+                      <ThemeToggle className="app-toggle-button-compact !w-full !justify-start !text-[color:var(--foreground)]" />
                     </div>
-                  ) : null}
-                  {profileError ? (
-                    <p className="mt-3 text-xs leading-5 text-[color:var(--muted)]">
-                      {translateRuntimeMessage(profileError, language)}
-                    </p>
-                  ) : null}
+
+                    <div className="rounded-[22px] border border-[color:var(--border)] bg-[color:var(--surface-soft)] px-4 py-3 text-sm">
+                      <p className="font-medium text-[color:var(--foreground)]">
+                        {user?.email ?? t("auth.notLoggedIn")}
+                      </p>
+                      <p className="mt-1 text-xs text-[color:var(--muted)]">
+                        {user ? t("auth.loggedIn") : t("auth.loggedOut")}
+                      </p>
+
+                      {user ? (
+                        <div className="mt-3 grid gap-2">
+                          {!isSetupPage ? (
+                            <Link
+                              href="/settings/journal"
+                              className="app-toggle-button-compact inline-flex !w-full items-center justify-start gap-2 !text-[color:var(--foreground)]"
+                            >
+                              <Settings2 className="h-4 w-4 shrink-0 text-[color:var(--accent-strong)]" />
+                              <span>{t("settings.journalLink")}</span>
+                            </Link>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => void handleLogout()}
+                            disabled={isLoggingOut}
+                            className="app-toggle-button-compact inline-flex !w-full items-center justify-start gap-2 !text-[color:var(--foreground)]"
+                          >
+                            <LogOut className="h-4 w-4 shrink-0 text-[color:var(--accent-strong)]" />
+                            <span>{isLoggingOut ? t("auth.loggingOut") : t("auth.logout")}</span>
+                          </button>
+                        </div>
+                      ) : null}
+
+                      {profileError ? (
+                        <p className="mt-3 text-xs leading-5 text-[color:var(--muted)]">
+                          {translateRuntimeMessage(profileError, language)}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    {!isHydrated ? (
+                      <p className="px-1 text-xs text-[color:var(--muted)]">{t("common.loading")}</p>
+                    ) : null}
+                  </div>
                 </div>
+              ) : null}
+              <div className="border-t border-[color:var(--border)] pt-3">
+                <TopNavigation mobile />
               </div>
-              <TopNavigation mobile />
             </div>
 
             <main className="flex-1 py-5 lg:py-7">

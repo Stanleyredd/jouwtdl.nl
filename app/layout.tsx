@@ -11,26 +11,18 @@ import { ThemeProvider } from "@/providers/theme-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  applicationName: "jouwtdl",
+  applicationName: "JouwTDL",
   title: {
-    default: "jouwtdl",
-    template: "%s | jouwtdl",
+    default: "JouwTDL",
+    template: "%s | JouwTDL",
   },
   description:
-    "jouwtdl is a calm personal productivity and reflection app with structured planning, journaling, and gentle AI guidance.",
-  icons: {
-    icon: [
-      {
-        url: "/brand/jouwtdl-mono.svg",
-        type: "image/svg+xml",
-      },
-    ],
-    shortcut: [
-      {
-        url: "/brand/jouwtdl-mono.svg",
-        type: "image/svg+xml",
-      },
-    ],
+    "JouwTDL is a calm personal productivity and reflection app with structured planning, journaling, and gentle AI guidance.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "JouwTDL",
+    statusBarStyle: "black-translucent",
   },
 };
 
