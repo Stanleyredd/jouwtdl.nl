@@ -23,7 +23,7 @@ const navigationItems = [
 
 export function TopNavigation({ mobile = false }: { mobile?: boolean }) {
   const pathname = usePathname();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   function isActivePath(href: string) {
     if (href === "/") {
@@ -60,27 +60,36 @@ export function TopNavigation({ mobile = false }: { mobile?: boolean }) {
       className={cn(
         "flex gap-1.5",
         mobile
-          ? "min-w-0 w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          ? "min-w-0 w-full snap-x snap-mandatory overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           : "flex-col rounded-[24px] border border-[color:var(--border)] bg-[color:var(--surface-overlay)] p-2.5 shadow-[var(--shadow-soft)]",
       )}
     >
       {navigationItems.map((item) => {
         const Icon = item.icon;
         const active = isActivePath(item.href);
+        const label =
+          mobile && item.href === "/planning"
+            ? language === "nl"
+              ? "Plan"
+              : "Plan"
+            : t(item.labelKey);
 
         return (
           <Link
             key={item.href}
             href={item.href}
             className={cn(
-              "group flex shrink-0 items-center gap-2.5 rounded-full px-3 py-2.5 text-sm transition",
+              "group flex shrink-0 items-center rounded-full transition",
+              mobile
+                ? "snap-start gap-2 px-4 py-3 text-[1.05rem] font-medium"
+                : "gap-2.5 px-3 py-2.5 text-sm",
               active
                 ? "bg-[color:var(--surface-overlay-strong)] text-[color:var(--foreground)] shadow-[var(--shadow-chip)]"
                 : "text-[color:var(--muted)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]",
             )}
           >
             <Icon className="h-4 w-4" strokeWidth={1.8} />
-            <span>{t(item.labelKey)}</span>
+            <span>{label}</span>
           </Link>
         );
       })}
