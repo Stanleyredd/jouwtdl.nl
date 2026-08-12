@@ -18,6 +18,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
 import { analyzeJournalEntryContent } from "@/services/analysis-service";
 import {
+  createDailyTask as createDailyTaskRequest,
+  deleteDailyTaskById,
+  listDailyTasks,
+  updateDailyTaskById,
+} from "@/services/daily-task-api-service";
+import {
   listJournalEntriesForUser,
   saveJournalEntryForUser,
   updateJournalSummaryForUser,
@@ -33,11 +39,21 @@ import {
 } from "@/services/planning-persistence-service";
 import { recalculateAppState } from "@/services/planning-service";
 import {
+  hasCompletedDailyTasksDatabaseMigration,
   hasCompletedMonthlyGoalsDatabaseMigration,
+  hasCompletedWeeklyGoalsDatabaseMigration,
   loadAppState,
+  markDailyTasksDatabaseMigrationComplete,
   markMonthlyGoalsDatabaseMigrationComplete,
+  markWeeklyGoalsDatabaseMigrationComplete,
   saveAppState,
 } from "@/services/storage-service";
+import {
+  createWeeklyGoal as createWeeklyGoalRequest,
+  deleteWeeklyGoalById,
+  listWeeklyGoals,
+  updateWeeklyGoalById,
+} from "@/services/weekly-goal-api-service";
 import type {
   AppState,
   DailyFocus,
@@ -162,6 +178,63 @@ function upsertJournalEntry(entries: JournalEntry[], nextEntry: JournalEntry) {
   return nextEntries.sort((left, right) => left.date.localeCompare(right.date));
 }
 
+function upsertById<T extends { id: string }>(items: T[], nextItem: T) {
+  return items.some((item) => item.id === nextItem.id)
+    ? items.map((item) => (item.id === nextItem.id ? nextItem : item))
+    : [...items, nextItem];
+}
+
+function applyWeeklyGoalUpdates(
+  goal: WeeklyGoal,
+  updates: Partial<WeeklyGoal>,
+): WeeklyGoal {
+  const startDate = updates.startDate ?? goal.startDate;
+
+  return {
+    ...goal,
+    ...updates,
+    weekNumber: getISOWeek(new Date(startDate)),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function applyDailyTaskUpdates(
+  task: DailyTask,
+  updates: Partial<DailyTask>,
+): DailyTask {
+  return {
+    ...task,
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function toWeeklyGoalApiPayload(goal: WeeklyGoal) {
+  return {
+    monthlyGoalId: goal.monthlyGoalId,
+    title: goal.title,
+    description: goal.description,
+    startDate: goal.startDate,
+    endDate: goal.endDate,
+    lifeArea: goal.lifeArea,
+    status: goal.status,
+    progress: goal.progress,
+  };
+}
+
+function toDailyTaskApiPayload(task: DailyTask) {
+  return {
+    weeklyGoalId: task.weeklyGoalId,
+    title: task.title,
+    note: task.note,
+    date: task.date,
+    priority: task.priority,
+    lifeArea: task.lifeArea,
+    completed: task.completed,
+    carryOverCount: task.carryOverCount,
+  };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user, supabase, isReady: isAuthReady, isConfigured } = useAuth();
   const { language } = useLanguage();
@@ -253,13 +326,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPlanningError(null);
     hasPlanningBaselineRef.current = false;
 
-    void listMonthlyGoals()
-      .then(async (remoteMonthlyGoals) => {
+    void Promise.all([listMonthlyGoals(), listWeeklyGoals(), listDailyTasks()])
+      .then(async ([remoteMonthlyGoals, remoteWeeklyGoals, remoteDailyTasks]) => {
         if (planningRequestIdRef.current !== requestId) {
           return;
         }
 
         let canonicalMonthlyGoals = remoteMonthlyGoals;
+        let canonicalWeeklyGoals = remoteWeeklyGoals;
+        let canonicalDailyTasks = remoteDailyTasks;
 
         if (!hasCompletedMonthlyGoalsDatabaseMigration(storageScope)) {
           const localMonthlyGoals = latestStateRef.current.monthlyGoals;
@@ -294,9 +369,93 @@ export function AppProvider({ children }: { children: ReactNode }) {
           markMonthlyGoalsDatabaseMigrationComplete(storageScope);
         }
 
+        if (!hasCompletedWeeklyGoalsDatabaseMigration(storageScope)) {
+          const localWeeklyGoals = latestStateRef.current.weeklyGoals;
+          const existingWeeklyGoalIds = new Set(
+            canonicalWeeklyGoals.map((goal) => goal.id),
+          );
+          const availableMonthlyGoalIds = new Set(
+            canonicalMonthlyGoals.map((goal) => goal.id),
+          );
+          const missingLocalWeeklyGoals = localWeeklyGoals.filter(
+            (goal) => !existingWeeklyGoalIds.has(goal.id),
+          );
+
+          if (missingLocalWeeklyGoals.length > 0) {
+            for (const localGoal of missingLocalWeeklyGoals) {
+              await createWeeklyGoalRequest({
+                id: localGoal.id,
+                monthlyGoalId:
+                  localGoal.monthlyGoalId &&
+                  availableMonthlyGoalIds.has(localGoal.monthlyGoalId)
+                    ? localGoal.monthlyGoalId
+                    : null,
+                title: localGoal.title,
+                description: localGoal.description,
+                startDate: localGoal.startDate,
+                endDate: localGoal.endDate,
+                lifeArea: localGoal.lifeArea,
+                status: localGoal.status,
+                progress: localGoal.progress,
+                createdAt: localGoal.createdAt,
+              });
+            }
+
+            if (planningRequestIdRef.current !== requestId) {
+              return;
+            }
+
+            canonicalWeeklyGoals = await listWeeklyGoals();
+          }
+
+          markWeeklyGoalsDatabaseMigrationComplete(storageScope);
+        }
+
+        if (!hasCompletedDailyTasksDatabaseMigration(storageScope)) {
+          const localDailyTasks = latestStateRef.current.dailyTasks;
+          const existingDailyTaskIds = new Set(canonicalDailyTasks.map((task) => task.id));
+          const availableWeeklyGoalIds = new Set(
+            canonicalWeeklyGoals.map((goal) => goal.id),
+          );
+          const missingLocalDailyTasks = localDailyTasks.filter(
+            (task) => !existingDailyTaskIds.has(task.id),
+          );
+
+          if (missingLocalDailyTasks.length > 0) {
+            for (const localTask of missingLocalDailyTasks) {
+              await createDailyTaskRequest({
+                id: localTask.id,
+                weeklyGoalId:
+                  localTask.weeklyGoalId &&
+                  availableWeeklyGoalIds.has(localTask.weeklyGoalId)
+                    ? localTask.weeklyGoalId
+                    : null,
+                title: localTask.title,
+                note: localTask.note,
+                date: localTask.date,
+                priority: localTask.priority,
+                lifeArea: localTask.lifeArea,
+                completed: localTask.completed,
+                carryOverCount: localTask.carryOverCount,
+                createdAt: localTask.createdAt,
+              });
+            }
+
+            if (planningRequestIdRef.current !== requestId) {
+              return;
+            }
+
+            canonicalDailyTasks = await listDailyTasks();
+          }
+
+          markDailyTasksDatabaseMigrationComplete(storageScope);
+        }
+
         const nextState = recalculateAppState({
           ...latestStateRef.current,
           monthlyGoals: canonicalMonthlyGoals,
+          weeklyGoals: canonicalWeeklyGoals,
+          dailyTasks: canonicalDailyTasks,
         });
 
         latestStateRef.current = nextState;
@@ -643,176 +802,602 @@ export function AppProvider({ children }: { children: ReactNode }) {
           });
       },
       addWeeklyGoal(input) {
-        commit((currentState) => ({
+        if (!user) {
+          commit((currentState) => ({
+            ...currentState,
+            weeklyGoals: [...currentState.weeklyGoals, buildWeeklyGoal(input)],
+          }));
+          return;
+        }
+
+        const optimisticGoal = buildWeeklyGoal(input);
+        const optimisticState = commit((currentState) => ({
           ...currentState,
-          weeklyGoals: [...currentState.weeklyGoals, buildWeeklyGoal(input)],
+          weeklyGoals: [...currentState.weeklyGoals, optimisticGoal],
         }));
+        const normalizedGoal =
+          optimisticState.weeklyGoals.find((goal) => goal.id === optimisticGoal.id) ??
+          optimisticGoal;
+
+        void createWeeklyGoalRequest({
+          id: normalizedGoal.id,
+          ...toWeeklyGoalApiPayload(normalizedGoal),
+          createdAt: optimisticGoal.createdAt,
+        })
+          .then((savedGoal) => {
+            commit((currentState) => ({
+              ...currentState,
+              weeklyGoals: upsertById(currentState.weeklyGoals, savedGoal),
+            }));
+            setPlanningError(null);
+          })
+          .catch((caughtError) => {
+            commit((currentState) => ({
+              ...currentState,
+              weeklyGoals: currentState.weeklyGoals.filter(
+                (goal) => goal.id !== optimisticGoal.id,
+              ),
+            }));
+            setPlanningError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Weekly goal could not be saved right now.",
+            );
+          });
       },
       updateWeeklyGoal(id, updates) {
-        commit((currentState) => ({
+        const previousGoal = latestStateRef.current.weeklyGoals.find(
+          (goal) => goal.id === id,
+        );
+
+        if (!previousGoal) {
+          return;
+        }
+
+        if (!user) {
+          commit((currentState) => ({
+            ...currentState,
+            weeklyGoals: currentState.weeklyGoals.map((goal) =>
+              goal.id === id ? applyWeeklyGoalUpdates(goal, updates) : goal,
+            ),
+          }));
+          return;
+        }
+
+        const optimisticState = commit((currentState) => ({
           ...currentState,
           weeklyGoals: currentState.weeklyGoals.map((goal) =>
-            goal.id === id
-              ? {
-                  ...goal,
-                  ...updates,
-                  weekNumber: updates.startDate
-                    ? getISOWeek(new Date(updates.startDate))
-                    : goal.weekNumber,
-                  updatedAt: new Date().toISOString(),
-                }
-              : goal,
+            goal.id === id ? applyWeeklyGoalUpdates(goal, updates) : goal,
           ),
         }));
+        const normalizedGoal = optimisticState.weeklyGoals.find(
+          (goal) => goal.id === id,
+        );
+
+        if (!normalizedGoal) {
+          return;
+        }
+
+        void updateWeeklyGoalById(id, toWeeklyGoalApiPayload(normalizedGoal))
+          .then((savedGoal) => {
+            commit((currentState) => ({
+              ...currentState,
+              weeklyGoals: currentState.weeklyGoals.map((goal) =>
+                goal.id === savedGoal.id ? savedGoal : goal,
+              ),
+            }));
+            setPlanningError(null);
+          })
+          .catch((caughtError) => {
+            commit((currentState) => ({
+              ...currentState,
+              weeklyGoals: currentState.weeklyGoals.map((goal) =>
+                goal.id === id ? previousGoal : goal,
+              ),
+            }));
+            setPlanningError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Weekly goal could not be saved right now.",
+            );
+          });
       },
       deleteWeeklyGoal(id) {
+        const previousWeeklyGoals = latestStateRef.current.weeklyGoals;
+        const previousDailyTasks = latestStateRef.current.dailyTasks;
+
+        if (!previousWeeklyGoals.some((goal) => goal.id === id)) {
+          return;
+        }
+
         commit((currentState) => ({
           ...currentState,
           weeklyGoals: currentState.weeklyGoals.filter((goal) => goal.id !== id),
           dailyTasks: currentState.dailyTasks.map((task) =>
             task.weeklyGoalId === id
-              ? {
-                  ...task,
-                  weeklyGoalId: null,
-                  updatedAt: new Date().toISOString(),
-                }
+              ? applyDailyTaskUpdates(task, { weeklyGoalId: null })
               : task,
           ),
         }));
+
+        if (!user) {
+          return;
+        }
+
+        void deleteWeeklyGoalById(id)
+          .then(() => {
+            setPlanningError(null);
+          })
+          .catch((caughtError) => {
+            commit((currentState) => ({
+              ...currentState,
+              weeklyGoals: previousWeeklyGoals,
+              dailyTasks: previousDailyTasks,
+            }));
+            setPlanningError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Weekly goal could not be deleted right now.",
+            );
+          });
       },
       addDailyTask(input) {
-        commit((currentState) => ({
+        if (!user) {
+          commit((currentState) => ({
+            ...currentState,
+            dailyTasks: [...currentState.dailyTasks, buildDailyTask(input)],
+          }));
+          return;
+        }
+
+        const optimisticTask = buildDailyTask(input);
+        const optimisticState = commit((currentState) => ({
           ...currentState,
-          dailyTasks: [...currentState.dailyTasks, buildDailyTask(input)],
+          dailyTasks: [...currentState.dailyTasks, optimisticTask],
         }));
+        const normalizedTask =
+          optimisticState.dailyTasks.find((task) => task.id === optimisticTask.id) ??
+          optimisticTask;
+
+        void createDailyTaskRequest({
+          id: normalizedTask.id,
+          ...toDailyTaskApiPayload(normalizedTask),
+          createdAt: optimisticTask.createdAt,
+        })
+          .then((savedTask) => {
+            commit((currentState) => ({
+              ...currentState,
+              dailyTasks: upsertById(currentState.dailyTasks, savedTask),
+            }));
+            setPlanningError(null);
+          })
+          .catch((caughtError) => {
+            commit((currentState) => ({
+              ...currentState,
+              dailyTasks: currentState.dailyTasks.filter(
+                (task) => task.id !== optimisticTask.id,
+              ),
+            }));
+            setPlanningError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Daily task could not be saved right now.",
+            );
+          });
       },
       updateDailyTask(id, updates) {
-        commit((currentState) => ({
+        const previousTask = latestStateRef.current.dailyTasks.find(
+          (task) => task.id === id,
+        );
+
+        if (!previousTask) {
+          return;
+        }
+
+        if (!user) {
+          commit((currentState) => ({
+            ...currentState,
+            dailyTasks: currentState.dailyTasks.map((task) =>
+              task.id === id ? applyDailyTaskUpdates(task, updates) : task,
+            ),
+          }));
+          return;
+        }
+
+        const optimisticState = commit((currentState) => ({
           ...currentState,
           dailyTasks: currentState.dailyTasks.map((task) =>
-            task.id === id
-              ? { ...task, ...updates, updatedAt: new Date().toISOString() }
-              : task,
+            task.id === id ? applyDailyTaskUpdates(task, updates) : task,
           ),
         }));
+        const normalizedTask = optimisticState.dailyTasks.find(
+          (task) => task.id === id,
+        );
+
+        if (!normalizedTask) {
+          return;
+        }
+
+        void updateDailyTaskById(id, toDailyTaskApiPayload(normalizedTask))
+          .then((savedTask) => {
+            commit((currentState) => ({
+              ...currentState,
+              dailyTasks: currentState.dailyTasks.map((task) =>
+                task.id === savedTask.id ? savedTask : task,
+              ),
+            }));
+            setPlanningError(null);
+          })
+          .catch((caughtError) => {
+            commit((currentState) => ({
+              ...currentState,
+              dailyTasks: currentState.dailyTasks.map((task) =>
+                task.id === id ? previousTask : task,
+              ),
+            }));
+            setPlanningError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Daily task could not be saved right now.",
+            );
+          });
       },
       deleteDailyTask(id) {
+        const previousDailyTasks = latestStateRef.current.dailyTasks;
+
+        if (!previousDailyTasks.some((task) => task.id === id)) {
+          return;
+        }
+
         commit((currentState) => ({
           ...currentState,
           dailyTasks: currentState.dailyTasks.filter((task) => task.id !== id),
         }));
+
+        if (!user) {
+          return;
+        }
+
+        void deleteDailyTaskById(id)
+          .then(() => {
+            setPlanningError(null);
+          })
+          .catch((caughtError) => {
+            commit((currentState) => ({
+              ...currentState,
+              dailyTasks: previousDailyTasks,
+            }));
+            setPlanningError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Daily task could not be deleted right now.",
+            );
+          });
       },
       toggleTask(id) {
-        commit((currentState) => ({
+        const previousTask = latestStateRef.current.dailyTasks.find(
+          (task) => task.id === id,
+        );
+
+        if (!previousTask) {
+          return;
+        }
+
+        const optimisticState = commit((currentState) => ({
           ...currentState,
           dailyTasks: currentState.dailyTasks.map((task) =>
             task.id === id
-              ? {
-                  ...task,
-                  completed: !task.completed,
-                  updatedAt: new Date().toISOString(),
-                }
+              ? applyDailyTaskUpdates(task, { completed: !task.completed })
               : task,
           ),
         }));
+
+        if (!user) {
+          return;
+        }
+
+        const normalizedTask = optimisticState.dailyTasks.find(
+          (task) => task.id === id,
+        );
+
+        if (!normalizedTask) {
+          return;
+        }
+
+        void updateDailyTaskById(id, toDailyTaskApiPayload(normalizedTask))
+          .then((savedTask) => {
+            commit((currentState) => ({
+              ...currentState,
+              dailyTasks: currentState.dailyTasks.map((task) =>
+                task.id === savedTask.id ? savedTask : task,
+              ),
+            }));
+            setPlanningError(null);
+          })
+          .catch((caughtError) => {
+            commit((currentState) => ({
+              ...currentState,
+              dailyTasks: currentState.dailyTasks.map((task) =>
+                task.id === id ? previousTask : task,
+              ),
+            }));
+            setPlanningError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Daily task could not be saved right now.",
+            );
+          });
       },
       rescheduleTask(id, newDate) {
-        commit((currentState) => ({
+        const previousTask = latestStateRef.current.dailyTasks.find(
+          (task) => task.id === id,
+        );
+
+        if (!previousTask) {
+          return;
+        }
+
+        const optimisticState = commit((currentState) => ({
           ...currentState,
           dailyTasks: currentState.dailyTasks.map((task) =>
             task.id === id
-              ? {
-                  ...task,
+              ? applyDailyTaskUpdates(task, {
                   date: newDate,
-                  carryOverCount: task.completed ? task.carryOverCount : task.carryOverCount + 1,
-                  updatedAt: new Date().toISOString(),
-                }
+                  carryOverCount: task.completed
+                    ? task.carryOverCount
+                    : task.carryOverCount + 1,
+                })
               : task,
           ),
         }));
+
+        if (!user) {
+          return;
+        }
+
+        const normalizedTask = optimisticState.dailyTasks.find(
+          (task) => task.id === id,
+        );
+
+        if (!normalizedTask) {
+          return;
+        }
+
+        void updateDailyTaskById(id, toDailyTaskApiPayload(normalizedTask))
+          .then((savedTask) => {
+            commit((currentState) => ({
+              ...currentState,
+              dailyTasks: currentState.dailyTasks.map((task) =>
+                task.id === savedTask.id ? savedTask : task,
+              ),
+            }));
+            setPlanningError(null);
+          })
+          .catch((caughtError) => {
+            commit((currentState) => ({
+              ...currentState,
+              dailyTasks: currentState.dailyTasks.map((task) =>
+                task.id === id ? previousTask : task,
+              ),
+            }));
+            setPlanningError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Daily task could not be saved right now.",
+            );
+          });
       },
       splitTask(id) {
-        commit((currentState) => {
-          const sourceTask = currentState.dailyTasks.find((task) => task.id === id);
-          if (!sourceTask) {
-            return currentState;
-          }
+        const previousDailyTasks = latestStateRef.current.dailyTasks;
+        const sourceTask = previousDailyTasks.find((task) => task.id === id);
 
-          return {
-            ...currentState,
-            dailyTasks: [
-              ...currentState.dailyTasks.map((task) =>
-                task.id === id
-                  ? {
-                      ...task,
-                      note: task.note
-                        ? `${task.note} Smaller first step created.`
-                        : "Smaller first step created.",
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : task,
-              ),
-              {
-                ...sourceTask,
-                id: createId("task"),
-                title: `First step: ${sourceTask.title}`,
-                note: "Created from carry-over support to make the task easier to start.",
-                priority: sourceTask.priority === "high" ? "medium" : sourceTask.priority,
-                completed: false,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-              },
-            ],
-          };
-        });
+        if (!sourceTask) {
+          return;
+        }
+
+        const splitOffTask: DailyTask = {
+          ...sourceTask,
+          id: createId("task"),
+          title: `First step: ${sourceTask.title}`,
+          note: "Created from carry-over support to make the task easier to start.",
+          priority: sourceTask.priority === "high" ? "medium" : sourceTask.priority,
+          completed: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        const optimisticState = commit((currentState) => ({
+          ...currentState,
+          dailyTasks: [
+            ...currentState.dailyTasks.map((task) =>
+              task.id === id
+                ? applyDailyTaskUpdates(task, {
+                    note: task.note
+                      ? `${task.note} Smaller first step created.`
+                      : "Smaller first step created.",
+                  })
+                : task,
+            ),
+            splitOffTask,
+          ],
+        }));
+
+        if (!user) {
+          return;
+        }
+
+        const normalizedSourceTask = optimisticState.dailyTasks.find(
+          (task) => task.id === id,
+        );
+        const normalizedSplitTask = optimisticState.dailyTasks.find(
+          (task) => task.id === splitOffTask.id,
+        );
+
+        if (!normalizedSourceTask || !normalizedSplitTask) {
+          return;
+        }
+
+        void (async () => {
+          try {
+            await updateDailyTaskById(id, toDailyTaskApiPayload(normalizedSourceTask));
+
+            try {
+              await createDailyTaskRequest({
+                id: normalizedSplitTask.id,
+                ...toDailyTaskApiPayload(normalizedSplitTask),
+                createdAt: splitOffTask.createdAt,
+              });
+            } catch (caughtError) {
+              await updateDailyTaskById(id, toDailyTaskApiPayload(sourceTask)).catch(
+                () => undefined,
+              );
+              throw caughtError;
+            }
+
+            setPlanningError(null);
+          } catch (caughtError) {
+            commit((currentState) => ({
+              ...currentState,
+              dailyTasks: previousDailyTasks,
+            }));
+            setPlanningError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Daily task could not be split right now.",
+            );
+          }
+        })();
       },
       convertTaskToWeeklyGoal(id) {
-        commit((currentState) => {
-          const task = currentState.dailyTasks.find((item) => item.id === id);
-          if (!task) {
-            return currentState;
-          }
+        const previousWeeklyGoals = latestStateRef.current.weeklyGoals;
+        const previousDailyTasks = latestStateRef.current.dailyTasks;
+        const task = previousDailyTasks.find((item) => item.id === id);
 
-          const parentWeeklyGoal = currentState.weeklyGoals.find(
-            (goal) => goal.id === task.weeklyGoalId,
-          );
-          const sourceWeek = getWeekRange(task.date);
+        if (!task) {
+          return;
+        }
 
-          return {
-            ...currentState,
-            weeklyGoals: [
-              ...currentState.weeklyGoals,
-              buildWeeklyGoal({
-                monthlyGoalId: parentWeeklyGoal?.monthlyGoalId ?? null,
-                title: toTitleCase(task.title),
-                description:
-                  task.note ||
-                  "Created from a postponed daily task so it can live at the weekly level.",
-                startDate: parentWeeklyGoal?.startDate ?? sourceWeek.startKey,
-                endDate: parentWeeklyGoal?.endDate ?? sourceWeek.endKey,
-                lifeArea: task.lifeArea,
-                status: "not_started",
-              }),
-            ],
-            dailyTasks: currentState.dailyTasks.filter((item) => item.id !== id),
-          };
+        const parentWeeklyGoal = previousWeeklyGoals.find(
+          (goal) => goal.id === task.weeklyGoalId,
+        );
+        const sourceWeek = getWeekRange(task.date);
+        const optimisticWeeklyGoal = buildWeeklyGoal({
+          monthlyGoalId: parentWeeklyGoal?.monthlyGoalId ?? null,
+          title: toTitleCase(task.title),
+          description:
+            task.note ||
+            "Created from a postponed daily task so it can live at the weekly level.",
+          startDate: parentWeeklyGoal?.startDate ?? sourceWeek.startKey,
+          endDate: parentWeeklyGoal?.endDate ?? sourceWeek.endKey,
+          lifeArea: task.lifeArea,
+          status: "not_started",
         });
+
+        commit((currentState) => ({
+          ...currentState,
+          weeklyGoals: [...currentState.weeklyGoals, optimisticWeeklyGoal],
+          dailyTasks: currentState.dailyTasks.filter((item) => item.id !== id),
+        }));
+
+        if (!user) {
+          return;
+        }
+
+        void (async () => {
+          try {
+            const savedGoal = await createWeeklyGoalRequest({
+              id: optimisticWeeklyGoal.id,
+              ...toWeeklyGoalApiPayload(optimisticWeeklyGoal),
+              createdAt: optimisticWeeklyGoal.createdAt,
+            });
+
+            try {
+              await deleteDailyTaskById(id);
+            } catch (caughtError) {
+              await deleteWeeklyGoalById(savedGoal.id).catch(() => undefined);
+              throw caughtError;
+            }
+
+            commit((currentState) => ({
+              ...currentState,
+              weeklyGoals: currentState.weeklyGoals.map((goal) =>
+                goal.id === savedGoal.id ? savedGoal : goal,
+              ),
+            }));
+            setPlanningError(null);
+          } catch (caughtError) {
+            commit((currentState) => ({
+              ...currentState,
+              weeklyGoals: previousWeeklyGoals,
+              dailyTasks: previousDailyTasks,
+            }));
+            setPlanningError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Task could not be converted to a weekly goal right now.",
+            );
+          }
+        })();
       },
       deprioritizeTask(id) {
-        commit((currentState) => ({
+        const previousTask = latestStateRef.current.dailyTasks.find(
+          (task) => task.id === id,
+        );
+
+        if (!previousTask) {
+          return;
+        }
+
+        const optimisticState = commit((currentState) => ({
           ...currentState,
           dailyTasks: currentState.dailyTasks.map((task) =>
             task.id === id
-              ? {
-                  ...task,
+              ? applyDailyTaskUpdates(task, {
                   priority: "low",
-                  date: toDateKey(new Date(Date.parse(task.date) + 24 * 60 * 60 * 1000)),
+                  date: toDateKey(
+                    new Date(Date.parse(task.date) + 24 * 60 * 60 * 1000),
+                  ),
                   carryOverCount: task.carryOverCount + 1,
-                  updatedAt: new Date().toISOString(),
-                }
+                })
               : task,
           ),
         }));
+
+        if (!user) {
+          return;
+        }
+
+        const normalizedTask = optimisticState.dailyTasks.find(
+          (task) => task.id === id,
+        );
+
+        if (!normalizedTask) {
+          return;
+        }
+
+        void updateDailyTaskById(id, toDailyTaskApiPayload(normalizedTask))
+          .then((savedTask) => {
+            commit((currentState) => ({
+              ...currentState,
+              dailyTasks: currentState.dailyTasks.map((task) =>
+                task.id === savedTask.id ? savedTask : task,
+              ),
+            }));
+            setPlanningError(null);
+          })
+          .catch((caughtError) => {
+            commit((currentState) => ({
+              ...currentState,
+              dailyTasks: currentState.dailyTasks.map((task) =>
+                task.id === id ? previousTask : task,
+              ),
+            }));
+            setPlanningError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Daily task could not be saved right now.",
+            );
+          });
       },
       setDailyFocus(input) {
         commit((currentState) => {

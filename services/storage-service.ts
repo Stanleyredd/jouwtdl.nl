@@ -5,6 +5,8 @@ import type { AppState } from "@/types";
 const STORAGE_PREFIX = "clarity-system::state";
 const CURRENT_VERSION = 1;
 const MONTHLY_GOALS_DATABASE_MIGRATION_KEY = "monthly-goals-db-v1";
+const WEEKLY_GOALS_DATABASE_MIGRATION_KEY = "weekly-goals-db-v1";
+const DAILY_TASKS_DATABASE_MIGRATION_KEY = "daily-tasks-db-v1";
 
 function getStorageKey(scope: string) {
   return `${STORAGE_PREFIX}::${scope}`;
@@ -12,6 +14,14 @@ function getStorageKey(scope: string) {
 
 function getMonthlyGoalsMigrationKey(scope: string) {
   return `${getStorageKey(scope)}::${MONTHLY_GOALS_DATABASE_MIGRATION_KEY}`;
+}
+
+function getWeeklyGoalsMigrationKey(scope: string) {
+  return `${getStorageKey(scope)}::${WEEKLY_GOALS_DATABASE_MIGRATION_KEY}`;
+}
+
+function getDailyTasksMigrationKey(scope: string) {
+  return `${getStorageKey(scope)}::${DAILY_TASKS_DATABASE_MIGRATION_KEY}`;
 }
 
 function createLocalBaselineState(useSeedData: boolean) {
@@ -119,6 +129,38 @@ export function markMonthlyGoalsDatabaseMigrationComplete(scope: string) {
   }
 
   window.localStorage.setItem(getMonthlyGoalsMigrationKey(scope), "true");
+}
+
+export function hasCompletedWeeklyGoalsDatabaseMigration(scope: string) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(getWeeklyGoalsMigrationKey(scope)) === "true";
+}
+
+export function markWeeklyGoalsDatabaseMigrationComplete(scope: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(getWeeklyGoalsMigrationKey(scope), "true");
+}
+
+export function hasCompletedDailyTasksDatabaseMigration(scope: string) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(getDailyTasksMigrationKey(scope)) === "true";
+}
+
+export function markDailyTasksDatabaseMigrationComplete(scope: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(getDailyTasksMigrationKey(scope), "true");
 }
 
 function normalizeLoadedState(state: AppState): AppState {
