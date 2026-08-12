@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Menu, MoonStar, Settings2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { Footer } from "@/components/footer";
 import { LanguageToggle } from "@/components/language-toggle";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -172,96 +173,96 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </aside>
 
-          <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-            <div className="sticky top-0 z-20 border-b border-[color:var(--border)] bg-[color:var(--shell-backdrop)] px-1 py-3 backdrop-blur lg:hidden">
-              <div className="relative flex items-center justify-center px-3 py-1">
-                <Link href="/" className="inline-flex items-center gap-3 text-center">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]">
-                    <MoonStar className="h-4.5 w-4.5" />
-                  </div>
-                  <div>
-                    <p className="text-lg font-semibold tracking-[-0.02em] text-[color:var(--foreground)]">
-                      {t("app.name")}
-                    </p>
-                    <p className="text-xs text-[color:var(--muted)]">{t("app.tagline")}</p>
-                  </div>
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setIsMobileMenuOpen((open) => !open)}
-                  className="app-icon-button absolute right-3 top-1/2 h-10 w-10 -translate-y-1/2"
-                  aria-expanded={isMobileMenuOpen}
-                  aria-label={
-                    isMobileMenuOpen
-                      ? language === "nl"
-                        ? "Menu sluiten"
-                        : "Close menu"
-                      : language === "nl"
-                        ? "Menu openen"
-                        : "Open menu"
-                  }
-                >
-                  {isMobileMenuOpen ? (
-                    <X className="h-4.5 w-4.5" strokeWidth={1.9} />
-                  ) : (
-                    <Menu className="h-4.5 w-4.5" strokeWidth={1.9} />
-                  )}
-                </button>
-              </div>
-              {isMobileMenuOpen ? (
-                <div className="px-3 pb-3 pt-3">
-                  <div className="app-surface app-panel ml-auto max-w-[340px] space-y-3 px-4 py-4">
-                    <div className="grid gap-2">
-                      <LanguageToggle className="app-toggle-button-compact !w-full !justify-start !text-[color:var(--foreground)]" />
-                      <ThemeToggle className="app-toggle-button-compact !w-full !justify-start !text-[color:var(--foreground)]" />
-                    </div>
+          <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden">
+            <div className="sticky top-0 z-20 bg-[color:var(--shell-backdrop)] px-1 py-3 backdrop-blur lg:hidden">
+              <div className="app-surface app-panel overflow-hidden rounded-[30px] px-4 py-4 shadow-[var(--shadow-soft)]">
+                <div className="relative flex min-h-[72px] items-center justify-center px-14">
+                  <Link href="/" className="inline-flex max-w-full justify-center">
+                    <BrandLogo
+                      tagline={t("app.tagline")}
+                      align="center"
+                      imageClassName="h-9 w-auto sm:h-10"
+                    />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileMenuOpen((open) => !open)}
+                    className="app-icon-button absolute right-0 top-1/2 h-11 w-11 -translate-y-1/2"
+                    aria-expanded={isMobileMenuOpen}
+                    aria-label={
+                      isMobileMenuOpen
+                        ? language === "nl"
+                          ? "Menu sluiten"
+                          : "Close menu"
+                        : language === "nl"
+                          ? "Menu openen"
+                          : "Open menu"
+                    }
+                  >
+                    {isMobileMenuOpen ? (
+                      <X className="h-4.5 w-4.5" strokeWidth={1.9} />
+                    ) : (
+                      <Menu className="h-4.5 w-4.5" strokeWidth={1.9} />
+                    )}
+                  </button>
+                </div>
+                {isMobileMenuOpen ? (
+                  <div className="mt-4 border-t border-[color:var(--border)] pt-4">
+                    <div className="space-y-3">
+                      <div className="grid gap-2">
+                        <LanguageToggle className="!w-full !justify-start !text-[color:var(--foreground)]" />
+                        <ThemeToggle className="!w-full !justify-start !text-[color:var(--foreground)]" />
+                      </div>
 
-                    <div className="rounded-[22px] border border-[color:var(--border)] bg-[color:var(--surface-soft)] px-4 py-3 text-sm">
-                      <p className="font-medium text-[color:var(--foreground)]">
-                        {user?.email ?? t("auth.notLoggedIn")}
-                      </p>
-                      <p className="mt-1 text-xs text-[color:var(--muted)]">
-                        {user ? t("auth.loggedIn") : t("auth.loggedOut")}
-                      </p>
+                      <div className="rounded-[24px] border border-[color:var(--border)] bg-[color:var(--surface-soft)] px-4 py-4 text-sm shadow-[var(--shadow-soft)]">
+                        <p className="font-medium text-[color:var(--foreground)]">
+                          {user?.email ?? t("auth.notLoggedIn")}
+                        </p>
+                        <p className="mt-1 text-xs text-[color:var(--muted)]">
+                          {user ? t("auth.loggedIn") : t("auth.loggedOut")}
+                        </p>
 
-                      {user ? (
-                        <div className="mt-3 grid gap-2">
-                          {!isSetupPage ? (
-                            <Link
-                              href="/settings/journal"
-                              className="app-toggle-button-compact inline-flex !w-full items-center justify-start gap-2 !text-[color:var(--foreground)]"
+                        {user ? (
+                          <div className="mt-3 grid gap-2">
+                            {!isSetupPage ? (
+                              <Link
+                                href="/settings/journal"
+                                className="app-toggle-button inline-flex !w-full items-center justify-start gap-2 !text-[color:var(--foreground)]"
+                              >
+                                <Settings2 className="h-4 w-4 shrink-0 text-[color:var(--accent-strong)]" />
+                                <span>{t("settings.journalLink")}</span>
+                              </Link>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => void handleLogout()}
+                              disabled={isLoggingOut}
+                              className="app-toggle-button inline-flex !w-full items-center justify-start gap-2 !text-[color:var(--foreground)]"
                             >
-                              <Settings2 className="h-4 w-4 shrink-0 text-[color:var(--accent-strong)]" />
-                              <span>{t("settings.journalLink")}</span>
-                            </Link>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() => void handleLogout()}
-                            disabled={isLoggingOut}
-                            className="app-toggle-button-compact inline-flex !w-full items-center justify-start gap-2 !text-[color:var(--foreground)]"
-                          >
-                            <LogOut className="h-4 w-4 shrink-0 text-[color:var(--accent-strong)]" />
-                            <span>{isLoggingOut ? t("auth.loggingOut") : t("auth.logout")}</span>
-                          </button>
-                        </div>
-                      ) : null}
+                              <LogOut className="h-4 w-4 shrink-0 text-[color:var(--accent-strong)]" />
+                              <span>{isLoggingOut ? t("auth.loggingOut") : t("auth.logout")}</span>
+                            </button>
+                          </div>
+                        ) : null}
 
-                      {profileError ? (
-                        <p className="mt-3 text-xs leading-5 text-[color:var(--muted)]">
-                          {translateRuntimeMessage(profileError, language)}
+                        {profileError ? (
+                          <p className="mt-3 text-xs leading-5 text-[color:var(--muted)]">
+                            {translateRuntimeMessage(profileError, language)}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      {!isHydrated ? (
+                        <p className="px-1 text-xs text-[color:var(--muted)]">
+                          {t("common.loading")}
                         </p>
                       ) : null}
                     </div>
-
-                    {!isHydrated ? (
-                      <p className="px-1 text-xs text-[color:var(--muted)]">{t("common.loading")}</p>
-                    ) : null}
                   </div>
+                ) : null}
+                <div className="mt-4 border-t border-[color:var(--border)] pt-4">
+                  <TopNavigation mobile />
                 </div>
-              ) : null}
-              <div className="border-t border-[color:var(--border)] pt-3">
-                <TopNavigation mobile />
               </div>
             </div>
 

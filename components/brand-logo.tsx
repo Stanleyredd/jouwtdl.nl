@@ -7,6 +7,7 @@ interface BrandLogoProps {
   className?: string;
   imageClassName?: string;
   showTagline?: boolean;
+  align?: "start" | "center";
 }
 
 export function BrandLogo({
@@ -14,9 +15,16 @@ export function BrandLogo({
   className,
   imageClassName,
   showTagline = true,
+  align = "start",
 }: BrandLogoProps) {
   return (
-    <div className={cn("flex flex-col items-start gap-1 text-left", className)}>
+    <div
+      className={cn(
+        "flex flex-col gap-1",
+        align === "center" ? "items-center text-center" : "items-start text-left",
+        className,
+      )}
+    >
       <Image
         src="/brand/jouwtdl-logo.svg"
         alt="jouwtdl"
@@ -25,7 +33,14 @@ export function BrandLogo({
         className={cn("h-10 w-auto", imageClassName)}
       />
       {showTagline && tagline ? (
-        <p className="pl-1 text-left text-xs text-[color:var(--muted)]">{tagline}</p>
+        <p
+          className={cn(
+            "text-xs text-[color:var(--muted)]",
+            align === "center" ? "text-center" : "pl-1 text-left",
+          )}
+        >
+          {tagline}
+        </p>
       ) : null}
     </div>
   );
