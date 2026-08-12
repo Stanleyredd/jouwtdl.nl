@@ -24,10 +24,10 @@ import {
   updateDailyTaskById,
 } from "@/services/daily-task-api-service";
 import {
-  listJournalEntriesForUser,
-  saveJournalEntryForUser,
-  updateJournalSummaryForUser,
-} from "@/services/journal-persistence-service";
+  listJournalEntries,
+  saveJournalEntry as saveJournalEntryRequest,
+  updateJournalSummaryByDate,
+} from "@/services/journal-entry-api-service";
 import {
   createMonthlyGoal as createMonthlyGoalRequest,
   deleteMonthlyGoalById,
@@ -39,10 +39,12 @@ import {
 } from "@/services/planning-persistence-service";
 import { recalculateAppState } from "@/services/planning-service";
 import {
+  hasCompletedJournalEntriesDatabaseMigration,
   hasCompletedDailyTasksDatabaseMigration,
   hasCompletedMonthlyGoalsDatabaseMigration,
   hasCompletedWeeklyGoalsDatabaseMigration,
   loadAppState,
+  markJournalEntriesDatabaseMigrationComplete,
   markDailyTasksDatabaseMigrationComplete,
   markMonthlyGoalsDatabaseMigrationComplete,
   markWeeklyGoalsDatabaseMigrationComplete,
@@ -554,47 +556,71 @@ export function AppProvider({ children }: { children: ReactNode }) {
     journalRequestIdRef.current += 1;
     const requestId = journalRequestIdRef.current;
 
-    if (!user || !supabase) {
+    if (!user) {
       setJournalError(null);
       setJournalStatus("ready");
-      setState((currentState) =>
-        currentState.journalEntries.length > 0
-          ? { ...currentState, journalEntries: [] }
-          : currentState,
-      );
       return;
     }
 
     setJournalStatus("loading");
     setJournalError(null);
-    setState((currentState) => ({
-      ...currentState,
-      journalEntries: [],
-    }));
 
-    void listJournalEntriesForUser(supabase, user.id, state.lifeAreas)
-      .then((entries) => {
+    void listJournalEntries(state.lifeAreas)
+      .then(async (remoteEntries) => {
         if (journalRequestIdRef.current !== requestId) {
           return;
+        }
+
+        let canonicalEntries = remoteEntries;
+
+        if (!hasCompletedJournalEntriesDatabaseMigration(storageScope)) {
+          const localEntries = latestStateRef.current.journalEntries;
+          const existingDates = new Set(remoteEntries.map((entry) => entry.date));
+          const missingLocalEntries = localEntries.filter(
+            (entry) => !existingDates.has(entry.date),
+          );
+
+          if (missingLocalEntries.length > 0) {
+            for (const localEntry of missingLocalEntries) {
+              await saveJournalEntryRequest({
+                date: localEntry.date,
+                sections: localEntry.sections,
+                rawTranscript: localEntry.rawTranscript,
+                editedTranscript: localEntry.editedTranscript,
+                tomorrowSetup: localEntry.tomorrowSetup,
+                language,
+                lifeAreas: latestStateRef.current.lifeAreas,
+                createdAt: localEntry.createdAt,
+                aiSummary: localEntry.aiSummary,
+                aiSummaryError: localEntry.aiSummaryError,
+                aiSummaryUpdatedAt: localEntry.aiSummaryUpdatedAt,
+              });
+            }
+
+            if (journalRequestIdRef.current !== requestId) {
+              return;
+            }
+
+            canonicalEntries = await listJournalEntries(state.lifeAreas);
+          }
+
+          markJournalEntriesDatabaseMigrationComplete(storageScope);
         }
 
         setState((currentState) =>
           recalculateAppState({
             ...currentState,
-            journalEntries: entries,
+            journalEntries: canonicalEntries,
           }),
         );
         setJournalStatus("ready");
+        setJournalError(null);
       })
       .catch((caughtError) => {
         if (journalRequestIdRef.current !== requestId) {
           return;
         }
 
-        setState((currentState) => ({
-          ...currentState,
-          journalEntries: [],
-        }));
         setJournalStatus("error");
         setJournalError(
           caughtError instanceof Error
@@ -607,9 +633,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isAuthReady,
     isConfigured,
     isHydrated,
+    language,
     state.lifeAreas,
     storageScope,
-    supabase,
     user,
   ]);
 
@@ -1441,13 +1467,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         let savedEntry: JournalEntry | null = null;
 
         try {
-          if (user && supabase) {
-            const savedEntry = await saveJournalEntryForUser({
-              client: supabase,
-              userId: user.id,
-              input,
+          if (user) {
+            const savedEntry = await saveJournalEntryRequest({
+              ...input,
               language,
-              lifeAreas: state.lifeAreas,
+              lifeAreas: latestStateRef.current.lifeAreas,
             });
 
             setState((currentState) =>
@@ -1464,7 +1488,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               console.debug("[journal-save]", "save-succeeded", {
                 date: savedEntry.date,
                 id: savedEntry.id,
-                source: "supabase",
+                source: "database",
               });
             }
 
@@ -1542,13 +1566,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       },
       async updateJournalSummary(date, updates) {
-        if (user && supabase) {
-          const updatedEntry = await updateJournalSummaryForUser({
-            client: supabase,
-            userId: user.id,
-            date,
-            updates,
-            lifeAreas: state.lifeAreas,
+        if (user) {
+          const updatedEntry = await updateJournalSummaryByDate(date, {
+            ...updates,
+            lifeAreas: latestStateRef.current.lifeAreas,
           });
 
           if (updatedEntry) {
@@ -1629,7 +1650,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     planningStatus,
     state,
     storageError,
-    supabase,
     user,
   ]);
 

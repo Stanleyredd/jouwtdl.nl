@@ -7,6 +7,7 @@ const CURRENT_VERSION = 1;
 const MONTHLY_GOALS_DATABASE_MIGRATION_KEY = "monthly-goals-db-v1";
 const WEEKLY_GOALS_DATABASE_MIGRATION_KEY = "weekly-goals-db-v1";
 const DAILY_TASKS_DATABASE_MIGRATION_KEY = "daily-tasks-db-v1";
+const JOURNAL_ENTRIES_DATABASE_MIGRATION_KEY = "journal-entries-db-v1";
 
 function getStorageKey(scope: string) {
   return `${STORAGE_PREFIX}::${scope}`;
@@ -22,6 +23,10 @@ function getWeeklyGoalsMigrationKey(scope: string) {
 
 function getDailyTasksMigrationKey(scope: string) {
   return `${getStorageKey(scope)}::${DAILY_TASKS_DATABASE_MIGRATION_KEY}`;
+}
+
+function getJournalEntriesMigrationKey(scope: string) {
+  return `${getStorageKey(scope)}::${JOURNAL_ENTRIES_DATABASE_MIGRATION_KEY}`;
 }
 
 function createLocalBaselineState(useSeedData: boolean) {
@@ -161,6 +166,22 @@ export function markDailyTasksDatabaseMigrationComplete(scope: string) {
   }
 
   window.localStorage.setItem(getDailyTasksMigrationKey(scope), "true");
+}
+
+export function hasCompletedJournalEntriesDatabaseMigration(scope: string) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(getJournalEntriesMigrationKey(scope)) === "true";
+}
+
+export function markJournalEntriesDatabaseMigrationComplete(scope: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(getJournalEntriesMigrationKey(scope), "true");
 }
 
 function normalizeLoadedState(state: AppState): AppState {
