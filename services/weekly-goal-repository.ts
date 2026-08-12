@@ -1,7 +1,7 @@
 import "server-only";
 
 import { Prisma, type WeeklyGoal as PrismaWeeklyGoal } from "@prisma/client";
-import { format, getISOWeek } from "date-fns";
+import { getISOWeek } from "date-fns";
 
 import { getPrismaClient } from "@/lib/prisma";
 import { createId } from "@/lib/utils";
@@ -39,7 +39,7 @@ export interface UpdateWeeklyGoalInput {
 }
 
 function formatDateOnly(value: Date) {
-  return format(value, "yyyy-MM-dd");
+  return value.toISOString().slice(0, 10);
 }
 
 function parseDateOnly(value: string) {

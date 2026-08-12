@@ -1,7 +1,6 @@
 import "server-only";
 
 import { Prisma, type MonthlyGoal as PrismaMonthlyGoal } from "@prisma/client";
-import { format } from "date-fns";
 
 import { getPrismaClient } from "@/lib/prisma";
 import { createId } from "@/lib/utils";
@@ -43,7 +42,7 @@ function formatDateOnly(value: Date | null) {
     return undefined;
   }
 
-  return format(value, "yyyy-MM-dd");
+  return value.toISOString().slice(0, 10);
 }
 
 function parseDateOnly(value: string | undefined) {
