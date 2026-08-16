@@ -20,6 +20,7 @@ model Profile {
   createdAt              DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
   journalEntries         JournalEntry[]
+  dreamEntries           DreamEntry[]
   monthlyGoals           MonthlyGoal[]
   weeklyGoals            WeeklyGoal[]
   dailyTasks             DailyTask[]
@@ -78,6 +79,23 @@ model TomorrowSetup {
 
   @@unique([journalEntryId, userId])
   @@map("tomorrow_setups")
+}
+
+model DreamEntry {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  title     String   @default("")
+  content   String   @default("")
+  dreamDate DateTime @map("dream_date") @db.Date
+  source    String   @default("text")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user      Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([id, userId])
+  @@index([userId])
+  @@index([userId, dreamDate])
+  @@map("dream_entries")
 }
 
 model MonthlyGoal {

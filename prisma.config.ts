@@ -1,13 +1,16 @@
-import "dotenv/config";
+import { config } from "dotenv";
+import { defineConfig, env } from "prisma/config";
 
-import { defineConfig } from "prisma/config";
+// Local Next.js environment
+config({ path: ".env.local" });
 
-const fallbackDatabaseUrl =
-  "postgresql://placeholder:placeholder@localhost:5432/placeholder";
+// Fallback for environments that use a regular .env file.
+// Existing process environment variables are not overwritten.
+config({ path: ".env" });
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
   datasource: {
-    url: process.env.DATABASE_URL ?? fallbackDatabaseUrl,
+    url: env("DATABASE_URL"),
   },
 });

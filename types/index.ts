@@ -1,5 +1,6 @@
 export type GoalStatus = "not_started" | "in_progress" | "completed" | "paused";
 export type TaskPriority = "low" | "medium" | "high";
+export type DreamSource = "voice" | "text";
 export type JournalPreset = "trading" | "business" | "personal" | "custom";
 export type AppTheme = "light" | "dark";
 export type InsightType =
@@ -126,6 +127,16 @@ export interface JournalEntry {
   blockersDetected: string[];
   oneSentenceDaySummary: string;
   tomorrowSetup: TomorrowSetup;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DreamEntry {
+  id: string;
+  title: string;
+  content: string;
+  dreamDate: string;
+  source: DreamSource;
   createdAt: string;
   updatedAt: string;
 }
