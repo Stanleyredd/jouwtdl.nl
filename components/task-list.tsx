@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, PencilLine, Trash2 } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { useLanguage } from "@/hooks/use-language";
 import { translateLifeAreaName } from "@/lib/i18n";
+import { getWeeklyGoalsForDate } from "@/services/planning-service";
 import { cn } from "@/lib/utils";
 import type { DailyTask, TaskPriority, WeeklyGoal } from "@/types";
 
@@ -49,8 +50,12 @@ export function TaskList({
   const { t, language } = useLanguage();
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editorState, setEditorState] = useState<EditorState | null>(null);
-  const weeklyGoals = Object.values(weeklyGoalLookup).filter(
-    (goal): goal is WeeklyGoal => Boolean(goal),
+  const weeklyGoals = useMemo(
+    () =>
+      Object.values(weeklyGoalLookup).filter(
+        (goal): goal is WeeklyGoal => Boolean(goal),
+      ),
+    [weeklyGoalLookup],
   );
 
   function startEditing(task: DailyTask) {
@@ -74,6 +79,27 @@ export function TaskList({
       {tasks.map((task) => {
         const isEditing = editingTaskId === task.id && editorState;
         const parentGoal = task.weeklyGoalId ? weeklyGoalLookup[task.weeklyGoalId] : undefined;
+        const availableWeeklyGoals =
+          isEditing && editorState
+            ? getWeeklyGoalsForDate(weeklyGoals, editorState.date)
+            : weeklyGoals;
+        const selectedWeeklyGoal =
+          isEditing && editorState.weeklyGoalId
+            ? weeklyGoalLookup[editorState.weeklyGoalId]
+            : undefined;
+        const preserveExistingWeeklyGoal =
+          Boolean(
+            isEditing &&
+              task.weeklyGoalId &&
+              task.weeklyGoalId === editorState.weeklyGoalId &&
+              task.date === editorState.date,
+          );
+        const visibleWeeklyGoals =
+          selectedWeeklyGoal &&
+          preserveExistingWeeklyGoal &&
+          !availableWeeklyGoals.some((goal) => goal.id === selectedWeeklyGoal.id)
+            ? [...availableWeeklyGoals, selectedWeeklyGoal]
+            : availableWeeklyGoals;
         const metaParts = [
           showDate ? task.date : null,
           t("task.week", { value: parentGoal?.title ?? t("common.other") }),
@@ -181,7 +207,7 @@ export function TaskList({
                     className="app-input"
                   >
                     <option value="">{t("common.other")}</option>
-                    {weeklyGoals.map((goal) => (
+                    {visibleWeeklyGoals.map((goal) => (
                       <option key={goal.id} value={goal.id}>
                         {goal.title}
                       </option>
@@ -204,9 +230,26 @@ export function TaskList({
                   <input
                     type="date"
                     value={editorState.date}
-                    onChange={(event) =>
-                      setEditorState({ ...editorState, date: event.target.value })
-                    }
+                    onChange={(event) => {
+                      const nextDate = event.target.value;
+                      const nextWeeklyGoals = getWeeklyGoalsForDate(
+                        weeklyGoals,
+                        nextDate,
+                      );
+                      const shouldKeepWeeklyGoal =
+                        !editorState.weeklyGoalId ||
+                        nextWeeklyGoals.some(
+                          (goal) => goal.id === editorState.weeklyGoalId,
+                        );
+
+                      setEditorState({
+                        ...editorState,
+                        date: nextDate,
+                        weeklyGoalId: shouldKeepWeeklyGoal
+                          ? editorState.weeklyGoalId
+                          : "",
+                      });
+                    }}
                     className="app-input"
                   />
                   <select

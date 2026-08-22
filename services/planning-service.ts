@@ -143,6 +143,14 @@ export function getMonthlyGoalsForDate(monthlyGoals: MonthlyGoal[], dateKey: str
   return monthlyGoals.filter((goal) => goal.month === month && goal.year === year);
 }
 
+export function getMonthlyGoalsForWeekStart(
+  monthlyGoals: MonthlyGoal[],
+  dateKey: string,
+) {
+  const weekStartKey = getWeekRange(dateKey).startKey;
+  return getMonthlyGoalsForDate(monthlyGoals, weekStartKey);
+}
+
 export function buildLifeAreaDistribution(
   state: AppState,
   start?: string,
