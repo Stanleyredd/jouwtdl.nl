@@ -11,6 +11,7 @@ const taskPriorities = new Set<TaskPriority>(["low", "medium", "high"]);
 export interface CreateDailyTaskInput {
   id?: string;
   weeklyGoalId?: string | null;
+  monthlyGoalId?: string | null;
   title: string;
   note: string;
   date: string;
@@ -23,6 +24,7 @@ export interface CreateDailyTaskInput {
 
 export interface UpdateDailyTaskInput {
   weeklyGoalId?: string | null;
+  monthlyGoalId?: string | null;
   title?: string;
   note?: string;
   date?: string;
@@ -70,6 +72,7 @@ function mapPrismaDailyTask(task: PrismaDailyTask): DailyTask {
   return {
     id: task.id,
     weeklyGoalId: task.weeklyGoalId,
+    monthlyGoalId: task.monthlyGoalId,
     title: task.title,
     note: task.note,
     date: formatDateOnly(task.date),
@@ -114,6 +117,26 @@ async function assertOwnedWeeklyGoal(
   return weeklyGoal;
 }
 
+async function assertOwnedMonthlyGoal(
+  userId: string,
+  monthlyGoalId: string | null | undefined,
+) {
+  if (!monthlyGoalId) {
+    return null;
+  }
+
+  const prisma = getPrismaClient();
+  const monthlyGoal = await prisma.monthlyGoal.findUnique({
+    where: { id: monthlyGoalId },
+  });
+
+  if (!monthlyGoal || monthlyGoal.userId !== userId) {
+    throw new Error("Monthly goal not found.");
+  }
+
+  return monthlyGoal;
+}
+
 export async function listDailyTasksForUser(userId: string) {
   const prisma = getPrismaClient();
   const tasks = await prisma.dailyTask.findMany({
@@ -149,12 +172,14 @@ export async function createDailyTaskForUser(
   }
 
   await assertOwnedWeeklyGoal(userId, input.weeklyGoalId);
+  await assertOwnedMonthlyGoal(userId, input.monthlyGoalId);
 
   const createdTask = await prisma.dailyTask.create({
     data: {
       id: requestedId,
       userId,
       weeklyGoalId: input.weeklyGoalId ?? null,
+      monthlyGoalId: input.monthlyGoalId ?? null,
       title: input.title,
       note: input.note,
       date: parseDateOnly(input.date),
@@ -189,10 +214,18 @@ export async function updateDailyTaskForUser(
     await assertOwnedWeeklyGoal(userId, input.weeklyGoalId);
   }
 
+  if (input.monthlyGoalId !== undefined) {
+    await assertOwnedMonthlyGoal(userId, input.monthlyGoalId);
+  }
+
   const updateData: Prisma.DailyTaskUncheckedUpdateInput = {};
 
   if (input.weeklyGoalId !== undefined) {
     updateData.weeklyGoalId = input.weeklyGoalId;
+  }
+
+  if (input.monthlyGoalId !== undefined) {
+    updateData.monthlyGoalId = input.monthlyGoalId;
   }
 
   if (input.title !== undefined) {
@@ -258,6 +291,12 @@ export function normalizeDailyTaskCreatePayload(
       : typeof candidate.weeklyGoalId === "string"
         ? candidate.weeklyGoalId
         : undefined;
+  const monthlyGoalId =
+    candidate.monthlyGoalId === null
+      ? null
+      : typeof candidate.monthlyGoalId === "string"
+        ? candidate.monthlyGoalId
+        : undefined;
   const title = typeof candidate.title === "string" ? candidate.title : "";
   const note = typeof candidate.note === "string" ? candidate.note : "";
   const date = typeof candidate.date === "string" ? candidate.date : "";
@@ -280,6 +319,7 @@ export function normalizeDailyTaskCreatePayload(
   return {
     id: typeof candidate.id === "string" ? candidate.id : undefined,
     weeklyGoalId,
+    monthlyGoalId,
     title,
     note,
     date,
@@ -310,6 +350,17 @@ export function normalizeDailyTaskUpdatePayload(
     }
 
     update.weeklyGoalId = candidate.weeklyGoalId;
+  }
+
+  if (candidate.monthlyGoalId !== undefined) {
+    if (
+      candidate.monthlyGoalId !== null &&
+      typeof candidate.monthlyGoalId !== "string"
+    ) {
+      throw new Error("Use a valid monthly goal.");
+    }
+
+    update.monthlyGoalId = candidate.monthlyGoalId;
   }
 
   if (candidate.title !== undefined) {

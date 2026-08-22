@@ -6,6 +6,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { getWeekRange, toDateKey } from "@/lib/date";
 import { translateLifeAreaName } from "@/lib/i18n";
 import {
+  getMonthlyGoalsForDate,
   getMonthlyGoalsForWeekStart,
   getWeeklyGoalsForDate,
 } from "@/services/planning-service";
@@ -87,6 +88,9 @@ export function MonthlyGoalForm({
   );
   const [lifeArea, setLifeArea] = useState(initialValue?.lifeArea ?? lifeAreas[0] ?? "trading");
   const [status, setStatus] = useState<GoalStatus>(initialValue?.status ?? "not_started");
+  const [progressMode, setProgressMode] = useState<MonthlyGoal["progressMode"]>(
+    initialValue?.progressMode ?? "linked_items",
+  );
   const [dueDate, setDueDate] = useState(initialValue?.dueDate ?? "");
 
   return (
@@ -111,7 +115,7 @@ export function MonthlyGoalForm({
           className={inputClassName}
         />
       </FieldLabel>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <FieldLabel label={t("form.month")}>
           <input
             type="number"
@@ -157,7 +161,24 @@ export function MonthlyGoalForm({
             <option value="paused">{t("form.paused")}</option>
           </select>
         </FieldLabel>
+        <FieldLabel label={t("form.progressMode")}>
+          <select
+            value={progressMode}
+            onChange={(event) =>
+              setProgressMode(event.target.value as MonthlyGoal["progressMode"])
+            }
+            className={inputClassName}
+          >
+            <option value="linked_items">{t("form.progressMode.linkedItems")}</option>
+            <option value="daily">{t("form.progressMode.daily")}</option>
+          </select>
+        </FieldLabel>
       </div>
+      <p className="text-sm text-[color:var(--muted)]">
+        {progressMode === "daily"
+          ? t("form.progressModeHint.dailyMonth")
+          : t("form.progressModeHint.linkedItems")}
+      </p>
       <FieldLabel label={t("form.dueDate")}>
         <input
           type="date"
@@ -177,6 +198,7 @@ export function MonthlyGoalForm({
               year,
               lifeArea,
               status,
+              progressMode,
               dueDate,
             })
           }
@@ -226,6 +248,9 @@ export function WeeklyGoalForm({
   );
   const [lifeArea, setLifeArea] = useState(initialValue?.lifeArea ?? lifeAreas[0] ?? "trading");
   const [status, setStatus] = useState<GoalStatus>(initialValue?.status ?? "not_started");
+  const [progressMode, setProgressMode] = useState<WeeklyGoal["progressMode"]>(
+    initialValue?.progressMode ?? "linked_items",
+  );
   const availableMonthlyGoals = useMemo(
     () => getMonthlyGoalsForWeekStart(monthlyGoals, startDate),
     [monthlyGoals, startDate],
@@ -306,7 +331,7 @@ export function WeeklyGoalForm({
           className={inputClassName}
         />
       </FieldLabel>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <FieldLabel label={t("form.start")}>
           <input
             type="date"
@@ -349,7 +374,24 @@ export function WeeklyGoalForm({
             <option value="paused">{t("form.paused")}</option>
           </select>
         </FieldLabel>
+        <FieldLabel label={t("form.progressMode")}>
+          <select
+            value={progressMode}
+            onChange={(event) =>
+              setProgressMode(event.target.value as WeeklyGoal["progressMode"])
+            }
+            className={inputClassName}
+          >
+            <option value="linked_items">{t("form.progressMode.linkedItems")}</option>
+            <option value="daily">{t("form.progressMode.daily")}</option>
+          </select>
+        </FieldLabel>
       </div>
+      <p className="text-sm text-[color:var(--muted)]">
+        {progressMode === "daily"
+          ? t("form.progressModeHint.dailyWeek")
+          : t("form.progressModeHint.linkedItems")}
+      </p>
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
@@ -362,6 +404,7 @@ export function WeeklyGoalForm({
               endDate,
               lifeArea,
               status,
+              progressMode,
             })
           }
           className="app-button-primary text-sm"
@@ -381,6 +424,7 @@ export function WeeklyGoalForm({
 export function DailyTaskForm({
   initialValue,
   weeklyGoals,
+  monthlyGoals,
   lifeAreas,
   defaultDate,
   onSubmit,
@@ -388,6 +432,7 @@ export function DailyTaskForm({
 }: {
   initialValue?: DailyTaskInput;
   weeklyGoals: WeeklyGoal[];
+  monthlyGoals: MonthlyGoal[];
   lifeAreas: string[];
   defaultDate?: string;
   onSubmit: (value: DailyTaskInput) => void;
@@ -396,6 +441,9 @@ export function DailyTaskForm({
   const { t, language } = useLanguage();
   const [weeklyGoalId, setWeeklyGoalId] = useState(
     initialValue ? (initialValue.weeklyGoalId ?? OTHER_OPTION_VALUE) : (weeklyGoals[0]?.id ?? OTHER_OPTION_VALUE),
+  );
+  const [monthlyGoalId, setMonthlyGoalId] = useState(
+    initialValue ? (initialValue.monthlyGoalId ?? OTHER_OPTION_VALUE) : OTHER_OPTION_VALUE,
   );
   const [title, setTitle] = useState(initialValue?.title ?? "");
   const [note, setNote] = useState(initialValue?.note ?? "");
@@ -410,8 +458,19 @@ export function DailyTaskForm({
     () => weeklyGoals.find((goal) => goal.id === weeklyGoalId),
     [weeklyGoalId, weeklyGoals],
   );
+  const availableMonthlyGoals = useMemo(
+    () => getMonthlyGoalsForDate(monthlyGoals, date),
+    [date, monthlyGoals],
+  );
+  const selectedMonthlyGoal = useMemo(
+    () => monthlyGoals.find((goal) => goal.id === monthlyGoalId),
+    [monthlyGoalId, monthlyGoals],
+  );
   const preserveExistingWeeklyGoal =
     initialValue?.weeklyGoalId === weeklyGoalId &&
+    initialValue.date === date;
+  const preserveExistingMonthlyGoal =
+    initialValue?.monthlyGoalId === monthlyGoalId &&
     initialValue.date === date;
   const effectiveWeeklyGoalId =
     !weeklyGoalId ||
@@ -419,6 +478,20 @@ export function DailyTaskForm({
     preserveExistingWeeklyGoal
       ? weeklyGoalId
       : OTHER_OPTION_VALUE;
+  const weeklyGoalMonthlyGoalId =
+    selectedWeeklyGoal?.monthlyGoalId &&
+    includesGoalId(availableMonthlyGoals, selectedWeeklyGoal.monthlyGoalId)
+      ? selectedWeeklyGoal.monthlyGoalId
+      : OTHER_OPTION_VALUE;
+  const effectiveMonthlyGoalId =
+    monthlyGoalId &&
+    (includesGoalId(availableMonthlyGoals, monthlyGoalId) ||
+      preserveExistingMonthlyGoal)
+      ? monthlyGoalId
+      : weeklyGoalMonthlyGoalId ||
+          (availableMonthlyGoals.length === 1
+            ? availableMonthlyGoals[0]?.id ?? OTHER_OPTION_VALUE
+            : OTHER_OPTION_VALUE);
   const visibleWeeklyGoals = useMemo(() => {
     if (
       selectedWeeklyGoal &&
@@ -430,13 +503,24 @@ export function DailyTaskForm({
 
     return availableWeeklyGoals;
   }, [availableWeeklyGoals, preserveExistingWeeklyGoal, selectedWeeklyGoal]);
+  const visibleMonthlyGoals = useMemo(() => {
+    if (
+      selectedMonthlyGoal &&
+      preserveExistingMonthlyGoal &&
+      !includesGoalId(availableMonthlyGoals, selectedMonthlyGoal.id)
+    ) {
+      return [...availableMonthlyGoals, selectedMonthlyGoal];
+    }
+
+    return availableMonthlyGoals;
+  }, [availableMonthlyGoals, preserveExistingMonthlyGoal, selectedMonthlyGoal]);
 
   return (
     <FormShell
       title={initialValue ? t("form.dailyTask.edit") : t("form.dailyTask.new")}
       description={t("form.makeNextStepObvious")}
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <FieldLabel label={t("form.weeklyGoal")}>
           <select
             value={effectiveWeeklyGoalId}
@@ -445,6 +529,20 @@ export function DailyTaskForm({
           >
             <option value={OTHER_OPTION_VALUE}>{t("common.other")}</option>
             {visibleWeeklyGoals.map((goal) => (
+              <option key={goal.id} value={goal.id}>
+                {goal.title}
+              </option>
+            ))}
+          </select>
+        </FieldLabel>
+        <FieldLabel label={t("form.monthlyGoal")}>
+          <select
+            value={effectiveMonthlyGoalId}
+            onChange={(event) => setMonthlyGoalId(event.target.value)}
+            className={inputClassName}
+          >
+            <option value={OTHER_OPTION_VALUE}>{t("common.other")}</option>
+            {visibleMonthlyGoals.map((goal) => (
               <option key={goal.id} value={goal.id}>
                 {goal.title}
               </option>
@@ -498,6 +596,17 @@ export function DailyTaskForm({
                   ? currentWeeklyGoalId
                   : OTHER_OPTION_VALUE,
               );
+              setMonthlyGoalId((currentMonthlyGoalId) => {
+                const nextMonthlyGoals = getMonthlyGoalsForDate(
+                  monthlyGoals,
+                  nextDate,
+                );
+
+                return !currentMonthlyGoalId ||
+                  includesGoalId(nextMonthlyGoals, currentMonthlyGoalId)
+                  ? currentMonthlyGoalId
+                  : OTHER_OPTION_VALUE;
+              });
             }}
             className={inputClassName}
           />
@@ -520,6 +629,7 @@ export function DailyTaskForm({
           onClick={() =>
             onSubmit({
               weeklyGoalId: effectiveWeeklyGoalId || null,
+              monthlyGoalId: effectiveMonthlyGoalId || null,
               title,
               note,
               date,

@@ -1,4 +1,5 @@
 export type GoalStatus = "not_started" | "in_progress" | "completed" | "paused";
+export type GoalProgressMode = "linked_items" | "daily";
 export type TaskPriority = "low" | "medium" | "high";
 export type DreamSource = "voice" | "text";
 export type JournalPreset = "trading" | "business" | "personal" | "custom";
@@ -28,6 +29,7 @@ export interface MonthlyGoal {
   year: number;
   lifeArea: string;
   status: GoalStatus;
+  progressMode: GoalProgressMode;
   progress: number;
   dueDate?: string;
   createdAt: string;
@@ -44,6 +46,7 @@ export interface WeeklyGoal {
   endDate: string;
   lifeArea: string;
   status: GoalStatus;
+  progressMode: GoalProgressMode;
   progress: number;
   createdAt: string;
   updatedAt: string;
@@ -52,6 +55,7 @@ export interface WeeklyGoal {
 export interface DailyTask {
   id: string;
   weeklyGoalId: string | null;
+  monthlyGoalId: string | null;
   title: string;
   note: string;
   date: string;
@@ -256,6 +260,7 @@ export interface MonthlyGoalInput {
   year: number;
   lifeArea: string;
   status?: GoalStatus;
+  progressMode?: GoalProgressMode;
   dueDate?: string;
 }
 
@@ -267,10 +272,12 @@ export interface WeeklyGoalInput {
   endDate: string;
   lifeArea: string;
   status?: GoalStatus;
+  progressMode?: GoalProgressMode;
 }
 
 export interface DailyTaskInput {
   weeklyGoalId: string | null;
+  monthlyGoalId: string | null;
   title: string;
   note: string;
   date: string;

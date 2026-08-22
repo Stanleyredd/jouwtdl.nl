@@ -1,6 +1,5 @@
 "use client";
 
-import { getISOWeek } from "date-fns";
 import {
   createContext,
   useCallback,
@@ -37,7 +36,10 @@ import {
 import {
   savePlanningStateForUser,
 } from "@/services/planning-persistence-service";
-import { recalculateAppState } from "@/services/planning-service";
+import {
+  recalculateAppState,
+  resolveDailyTaskMonthlyGoalId,
+} from "@/services/planning-service";
 import {
   hasCompletedJournalEntriesDatabaseMigration,
   hasCompletedDailyTasksDatabaseMigration,
@@ -118,6 +120,7 @@ function buildMonthlyGoal(input: MonthlyGoalInput): MonthlyGoal {
     year: input.year,
     lifeArea: input.lifeArea,
     status: input.status ?? "not_started",
+    progressMode: input.progressMode ?? "linked_items",
     progress: 0,
     dueDate: input.dueDate,
     createdAt: timestamp,
@@ -132,11 +135,12 @@ function buildWeeklyGoal(input: WeeklyGoalInput): WeeklyGoal {
     monthlyGoalId: input.monthlyGoalId ?? null,
     title: input.title,
     description: input.description,
-    weekNumber: getISOWeek(new Date(input.startDate)),
+    weekNumber: getWeekRange(input.startDate).weekNumber,
     startDate: input.startDate,
     endDate: input.endDate,
     lifeArea: input.lifeArea,
     status: input.status ?? "not_started",
+    progressMode: input.progressMode ?? "linked_items",
     progress: 0,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -148,6 +152,7 @@ function buildDailyTask(input: DailyTaskInput): DailyTask {
   return {
     id: createId("task"),
     weeklyGoalId: input.weeklyGoalId ?? null,
+    monthlyGoalId: input.monthlyGoalId ?? null,
     title: input.title,
     note: input.note,
     date: input.date,
@@ -195,7 +200,7 @@ function applyWeeklyGoalUpdates(
   return {
     ...goal,
     ...updates,
-    weekNumber: getISOWeek(new Date(startDate)),
+    weekNumber: getWeekRange(startDate).weekNumber,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -211,6 +216,31 @@ function applyDailyTaskUpdates(
   };
 }
 
+function normalizeDailyTaskGoalLinks(
+  task: DailyTask,
+  monthlyGoals: MonthlyGoal[],
+  weeklyGoals: WeeklyGoal[],
+): DailyTask {
+  return {
+    ...task,
+    monthlyGoalId: resolveDailyTaskMonthlyGoalId(monthlyGoals, weeklyGoals, task),
+  };
+}
+
+function toMonthlyGoalApiPayload(goal: MonthlyGoal) {
+  return {
+    title: goal.title,
+    description: goal.description,
+    month: goal.month,
+    year: goal.year,
+    lifeArea: goal.lifeArea,
+    status: goal.status,
+    progressMode: goal.progressMode,
+    progress: goal.progress,
+    dueDate: goal.dueDate,
+  };
+}
+
 function toWeeklyGoalApiPayload(goal: WeeklyGoal) {
   return {
     monthlyGoalId: goal.monthlyGoalId,
@@ -220,6 +250,7 @@ function toWeeklyGoalApiPayload(goal: WeeklyGoal) {
     endDate: goal.endDate,
     lifeArea: goal.lifeArea,
     status: goal.status,
+    progressMode: goal.progressMode,
     progress: goal.progress,
   };
 }
@@ -227,6 +258,7 @@ function toWeeklyGoalApiPayload(goal: WeeklyGoal) {
 function toDailyTaskApiPayload(task: DailyTask) {
   return {
     weeklyGoalId: task.weeklyGoalId,
+    monthlyGoalId: task.monthlyGoalId,
     title: task.title,
     note: task.note,
     date: task.date,
@@ -349,14 +381,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             for (const localGoal of missingLocalGoals) {
               await createMonthlyGoalRequest({
                 id: localGoal.id,
-                title: localGoal.title,
-                description: localGoal.description,
-                month: localGoal.month,
-                year: localGoal.year,
-                lifeArea: localGoal.lifeArea,
-                status: localGoal.status,
-                progress: localGoal.progress,
-                dueDate: localGoal.dueDate,
+                ...toMonthlyGoalApiPayload(localGoal),
                 createdAt: localGoal.createdAt,
               });
             }
@@ -398,6 +423,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 endDate: localGoal.endDate,
                 lifeArea: localGoal.lifeArea,
                 status: localGoal.status,
+                progressMode: localGoal.progressMode ?? "linked_items",
                 progress: localGoal.progress,
                 createdAt: localGoal.createdAt,
               });
@@ -432,6 +458,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
                   availableWeeklyGoalIds.has(localTask.weeklyGoalId)
                     ? localTask.weeklyGoalId
                     : null,
+                monthlyGoalId: normalizeDailyTaskGoalLinks(
+                  localTask,
+                  canonicalMonthlyGoals,
+                  canonicalWeeklyGoals,
+                ).monthlyGoalId,
                 title: localTask.title,
                 note: localTask.note,
                 date: localTask.date,
@@ -677,14 +708,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         void createMonthlyGoalRequest({
           id: normalizedGoal.id,
-          title: normalizedGoal.title,
-          description: normalizedGoal.description,
-          month: normalizedGoal.month,
-          year: normalizedGoal.year,
-          lifeArea: normalizedGoal.lifeArea,
-          status: normalizedGoal.status,
-          progress: normalizedGoal.progress,
-          dueDate: normalizedGoal.dueDate,
+          ...toMonthlyGoalApiPayload(normalizedGoal),
           createdAt: optimisticGoal.createdAt,
         })
           .then((savedGoal) => {
@@ -751,16 +775,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        void updateMonthlyGoalById(id, {
-          title: normalizedGoal.title,
-          description: normalizedGoal.description,
-          month: normalizedGoal.month,
-          year: normalizedGoal.year,
-          lifeArea: normalizedGoal.lifeArea,
-          status: normalizedGoal.status,
-          progress: normalizedGoal.progress,
-          dueDate: normalizedGoal.dueDate,
-        })
+        void updateMonthlyGoalById(id, toMonthlyGoalApiPayload(normalizedGoal))
           .then((savedGoal) => {
             commit((currentState) => ({
               ...currentState,
@@ -787,6 +802,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteMonthlyGoal(id) {
         const previousMonthlyGoals = latestStateRef.current.monthlyGoals;
         const previousWeeklyGoals = latestStateRef.current.weeklyGoals;
+        const previousDailyTasks = latestStateRef.current.dailyTasks;
 
         if (!previousMonthlyGoals.some((goal) => goal.id === id)) {
           return;
@@ -804,6 +820,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 }
               : goal,
           ),
+          dailyTasks: currentState.dailyTasks.map((task) =>
+            task.monthlyGoalId === id
+              ? {
+                  ...task,
+                  monthlyGoalId: null,
+                  updatedAt: new Date().toISOString(),
+                }
+              : task,
+          ),
         }));
 
         if (!user) {
@@ -819,6 +844,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ...currentState,
               monthlyGoals: previousMonthlyGoals,
               weeklyGoals: previousWeeklyGoals,
+              dailyTasks: previousDailyTasks,
             }));
             setPlanningError(
               caughtError instanceof Error
@@ -969,21 +995,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       addDailyTask(input) {
         if (!user) {
+          const guestTask = normalizeDailyTaskGoalLinks(
+            buildDailyTask(input),
+            latestStateRef.current.monthlyGoals,
+            latestStateRef.current.weeklyGoals,
+          );
           commit((currentState) => ({
             ...currentState,
-            dailyTasks: [...currentState.dailyTasks, buildDailyTask(input)],
+            dailyTasks: [...currentState.dailyTasks, guestTask],
           }));
           return;
         }
 
         const optimisticTask = buildDailyTask(input);
+        const normalizedOptimisticTask = normalizeDailyTaskGoalLinks(
+          optimisticTask,
+          latestStateRef.current.monthlyGoals,
+          latestStateRef.current.weeklyGoals,
+        );
         const optimisticState = commit((currentState) => ({
           ...currentState,
-          dailyTasks: [...currentState.dailyTasks, optimisticTask],
+          dailyTasks: [...currentState.dailyTasks, normalizedOptimisticTask],
         }));
         const normalizedTask =
-          optimisticState.dailyTasks.find((task) => task.id === optimisticTask.id) ??
-          optimisticTask;
+          optimisticState.dailyTasks.find((task) => task.id === normalizedOptimisticTask.id) ??
+          normalizedOptimisticTask;
 
         void createDailyTaskRequest({
           id: normalizedTask.id,
@@ -1001,7 +1037,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             commit((currentState) => ({
               ...currentState,
               dailyTasks: currentState.dailyTasks.filter(
-                (task) => task.id !== optimisticTask.id,
+                (task) => task.id !== normalizedOptimisticTask.id,
               ),
             }));
             setPlanningError(
@@ -1024,7 +1060,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           commit((currentState) => ({
             ...currentState,
             dailyTasks: currentState.dailyTasks.map((task) =>
-              task.id === id ? applyDailyTaskUpdates(task, updates) : task,
+              task.id === id
+                ? normalizeDailyTaskGoalLinks(
+                    applyDailyTaskUpdates(task, updates),
+                    currentState.monthlyGoals,
+                    currentState.weeklyGoals,
+                  )
+                : task,
             ),
           }));
           return;
@@ -1033,7 +1075,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const optimisticState = commit((currentState) => ({
           ...currentState,
           dailyTasks: currentState.dailyTasks.map((task) =>
-            task.id === id ? applyDailyTaskUpdates(task, updates) : task,
+            task.id === id
+              ? normalizeDailyTaskGoalLinks(
+                  applyDailyTaskUpdates(task, updates),
+                  currentState.monthlyGoals,
+                  currentState.weeklyGoals,
+                )
+              : task,
           ),
         }));
         const normalizedTask = optimisticState.dailyTasks.find(
@@ -1167,12 +1215,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...currentState,
           dailyTasks: currentState.dailyTasks.map((task) =>
             task.id === id
-              ? applyDailyTaskUpdates(task, {
-                  date: newDate,
-                  carryOverCount: task.completed
-                    ? task.carryOverCount
-                    : task.carryOverCount + 1,
-                })
+              ? normalizeDailyTaskGoalLinks(
+                  applyDailyTaskUpdates(task, {
+                    date: newDate,
+                    carryOverCount: task.completed
+                      ? task.carryOverCount
+                      : task.carryOverCount + 1,
+                  }),
+                  currentState.monthlyGoals,
+                  currentState.weeklyGoals,
+                )
               : task,
           ),
         }));

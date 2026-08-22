@@ -71,6 +71,7 @@ export default function HomePage() {
 
         <TaskList
           tasks={tasksToShow}
+          monthlyGoals={state.monthlyGoals}
           weeklyGoalLookup={weeklyGoalLookup}
           lifeAreas={state.lifeAreas}
           emptyTitle={t("today.noTasks")}

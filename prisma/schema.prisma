@@ -107,12 +107,14 @@ model MonthlyGoal {
   year        Int
   lifeArea    String       @default("") @map("life_area")
   status      String       @default("not_started")
+  progressMode String      @default("linked_items") @map("progress_mode")
   progress    Int          @default(0)
   dueDate     DateTime?    @map("due_date") @db.Date
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
   user        Profile      @relation(fields: [userId], references: [id], onDelete: Cascade)
   weeklyGoals WeeklyGoal[]
+  dailyTasks  DailyTask[]
 
   @@unique([id, userId])
   @@map("monthly_goals")
@@ -129,11 +131,12 @@ model WeeklyGoal {
   endDate       DateTime     @map("end_date") @db.Date
   lifeArea      String       @default("") @map("life_area")
   status        String       @default("not_started")
+  progressMode  String       @default("linked_items") @map("progress_mode")
   progress      Int          @default(0)
   createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
   user          Profile      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  monthlyGoal   MonthlyGoal? @relation(fields: [monthlyGoalId, userId], references: [id, userId], onDelete: SetNull)
+  monthlyGoal   MonthlyGoal? @relation(fields: [monthlyGoalId, userId], references: [id, userId], onDelete: NoAction)
   dailyTasks    DailyTask[]
 
   @@unique([id, userId])
@@ -144,6 +147,7 @@ model DailyTask {
   id             String      @id
   userId         String      @map("user_id") @db.Uuid
   weeklyGoalId   String?     @map("weekly_goal_id")
+  monthlyGoalId  String?     @map("monthly_goal_id")
   title          String      @default("")
   note           String      @default("")
   date           DateTime    @db.Date
@@ -154,7 +158,8 @@ model DailyTask {
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
   user           Profile     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  weeklyGoal     WeeklyGoal? @relation(fields: [weeklyGoalId, userId], references: [id, userId], onDelete: SetNull)
+  weeklyGoal     WeeklyGoal? @relation(fields: [weeklyGoalId, userId], references: [id, userId], onDelete: NoAction)
+  monthlyGoal    MonthlyGoal? @relation(fields: [monthlyGoalId, userId], references: [id, userId], onDelete: NoAction)
 
   @@unique([id, userId])
   @@map("daily_tasks")

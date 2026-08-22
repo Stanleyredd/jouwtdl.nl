@@ -5,7 +5,7 @@ import { getISOWeek } from "date-fns";
 
 import { getPrismaClient } from "@/lib/prisma";
 import { createId } from "@/lib/utils";
-import type { GoalStatus, WeeklyGoal } from "@/types";
+import type { GoalProgressMode, GoalStatus, WeeklyGoal } from "@/types";
 
 const goalStatuses = new Set<GoalStatus>([
   "not_started",
@@ -13,6 +13,7 @@ const goalStatuses = new Set<GoalStatus>([
   "completed",
   "paused",
 ]);
+const goalProgressModes = new Set<GoalProgressMode>(["linked_items", "daily"]);
 
 export interface CreateWeeklyGoalInput {
   id?: string;
@@ -23,6 +24,7 @@ export interface CreateWeeklyGoalInput {
   endDate: string;
   lifeArea: string;
   status: GoalStatus;
+  progressMode: GoalProgressMode;
   progress: number;
   createdAt?: string;
 }
@@ -35,6 +37,7 @@ export interface UpdateWeeklyGoalInput {
   endDate?: string;
   lifeArea?: string;
   status?: GoalStatus;
+  progressMode?: GoalProgressMode;
   progress?: number;
 }
 
@@ -89,6 +92,7 @@ function mapPrismaWeeklyGoal(goal: PrismaWeeklyGoal): WeeklyGoal {
     endDate: formatDateOnly(goal.endDate),
     lifeArea: goal.lifeArea,
     status: goal.status as GoalStatus,
+    progressMode: goal.progressMode as GoalProgressMode,
     progress: goal.progress,
     createdAt: goal.createdAt.toISOString(),
     updatedAt: goal.updatedAt.toISOString(),
@@ -180,6 +184,7 @@ export async function createWeeklyGoalForUser(
       endDate,
       lifeArea: input.lifeArea,
       status: input.status,
+      progressMode: input.progressMode,
       progress: clampProgress(input.progress),
       ...(createdAt
         ? {
@@ -247,6 +252,10 @@ export async function updateWeeklyGoalForUser(
     updateData.status = input.status;
   }
 
+  if (input.progressMode !== undefined) {
+    updateData.progressMode = input.progressMode;
+  }
+
   if (input.progress !== undefined) {
     updateData.progress = clampProgress(input.progress);
   }
@@ -309,9 +318,17 @@ export function normalizeWeeklyGoalCreatePayload(
     typeof candidate.createdAt === "string" ? candidate.createdAt : undefined;
   const progress =
     typeof candidate.progress === "number" ? candidate.progress : 0;
+  const progressMode =
+    typeof candidate.progressMode === "string"
+      ? candidate.progressMode
+      : "linked_items";
 
   if (!goalStatuses.has(candidate.status as GoalStatus)) {
     throw new Error("Use a valid weekly goal status.");
+  }
+
+  if (!goalProgressModes.has(progressMode as GoalProgressMode)) {
+    throw new Error("Use a valid progress mode.");
   }
 
   if (!startDate.trim() || !endDate.trim()) {
@@ -327,6 +344,7 @@ export function normalizeWeeklyGoalCreatePayload(
     endDate,
     lifeArea,
     status: candidate.status as GoalStatus,
+    progressMode: progressMode as GoalProgressMode,
     progress,
     createdAt,
   };
@@ -393,6 +411,16 @@ export function normalizeWeeklyGoalUpdatePayload(
       throw new Error("Use a valid weekly goal status.");
     }
     update.status = candidate.status as GoalStatus;
+  }
+
+  if (candidate.progressMode !== undefined) {
+    if (
+      typeof candidate.progressMode !== "string" ||
+      !goalProgressModes.has(candidate.progressMode as GoalProgressMode)
+    ) {
+      throw new Error("Use a valid progress mode.");
+    }
+    update.progressMode = candidate.progressMode as GoalProgressMode;
   }
 
   if (candidate.progress !== undefined) {

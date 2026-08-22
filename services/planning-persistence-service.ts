@@ -4,6 +4,7 @@ import type {
   AppState,
   DailyFocus,
   DailyTask,
+  GoalProgressMode,
   MonthlyGoal,
   WeeklyGoal,
 } from "@/types";
@@ -15,6 +16,12 @@ type MonthlyGoalRow = Database["public"]["Tables"]["monthly_goals"]["Row"];
 type WeeklyGoalRow = Database["public"]["Tables"]["weekly_goals"]["Row"];
 type DailyTaskRow = Database["public"]["Tables"]["daily_tasks"]["Row"];
 type DailyFocusRow = Database["public"]["Tables"]["daily_focuses"]["Row"];
+
+function normalizeGoalProgressMode(
+  value: string | null | undefined,
+): GoalProgressMode {
+  return value === "daily" ? "daily" : "linked_items";
+}
 
 function serializePlanningError(error: unknown) {
   if (!(error instanceof Error) && (typeof error !== "object" || error === null)) {
@@ -151,6 +158,7 @@ function mapMonthlyGoalRow(row: MonthlyGoalRow): MonthlyGoal {
     year: row.year,
     lifeArea: row.life_area,
     status: row.status as MonthlyGoal["status"],
+    progressMode: normalizeGoalProgressMode(row.progress_mode),
     progress: row.progress,
     dueDate: row.due_date ?? undefined,
     createdAt: row.created_at,
@@ -169,6 +177,7 @@ function mapWeeklyGoalRow(row: WeeklyGoalRow): WeeklyGoal {
     endDate: row.end_date,
     lifeArea: row.life_area,
     status: row.status as WeeklyGoal["status"],
+    progressMode: normalizeGoalProgressMode(row.progress_mode),
     progress: row.progress,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -179,6 +188,7 @@ function mapDailyTaskRow(row: DailyTaskRow): DailyTask {
   return {
     id: row.id,
     weeklyGoalId: row.weekly_goal_id,
+    monthlyGoalId: row.monthly_goal_id,
     title: row.title,
     note: row.note,
     date: row.date,
@@ -215,6 +225,7 @@ function buildMonthlyGoalRow(
     year: goal.year,
     life_area: goal.lifeArea,
     status: goal.status,
+    progress_mode: goal.progressMode,
     progress: goal.progress,
     due_date: goal.dueDate?.trim() ? goal.dueDate : null,
     created_at: goal.createdAt,
@@ -237,6 +248,7 @@ function buildWeeklyGoalRow(
     end_date: goal.endDate,
     life_area: goal.lifeArea,
     status: goal.status,
+    progress_mode: goal.progressMode,
     progress: goal.progress,
     created_at: goal.createdAt,
     updated_at: goal.updatedAt,
@@ -251,6 +263,7 @@ function buildDailyTaskRow(
     id: task.id,
     user_id: userId,
     weekly_goal_id: task.weeklyGoalId,
+    monthly_goal_id: task.monthlyGoalId,
     title: task.title,
     note: task.note,
     date: task.date,

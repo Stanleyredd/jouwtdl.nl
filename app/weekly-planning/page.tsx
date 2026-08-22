@@ -297,6 +297,7 @@ export default function WeeklyPlanningPage() {
           </div>
           <TaskList
             tasks={section.tasks}
+            monthlyGoals={state.monthlyGoals}
             weeklyGoalLookup={weeklyGoalLookup}
             lifeAreas={state.lifeAreas}
             emptyTitle={t("today.noTasks")}

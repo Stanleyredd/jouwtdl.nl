@@ -4,7 +4,7 @@ import { Prisma, type MonthlyGoal as PrismaMonthlyGoal } from "@prisma/client";
 
 import { getPrismaClient } from "@/lib/prisma";
 import { createId } from "@/lib/utils";
-import type { GoalStatus, MonthlyGoal } from "@/types";
+import type { GoalProgressMode, GoalStatus, MonthlyGoal } from "@/types";
 
 const goalStatuses = new Set<GoalStatus>([
   "not_started",
@@ -12,6 +12,7 @@ const goalStatuses = new Set<GoalStatus>([
   "completed",
   "paused",
 ]);
+const goalProgressModes = new Set<GoalProgressMode>(["linked_items", "daily"]);
 
 export interface CreateMonthlyGoalInput {
   id?: string;
@@ -21,6 +22,7 @@ export interface CreateMonthlyGoalInput {
   year: number;
   lifeArea: string;
   status: GoalStatus;
+  progressMode: GoalProgressMode;
   progress: number;
   dueDate?: string;
   createdAt?: string;
@@ -33,6 +35,7 @@ export interface UpdateMonthlyGoalInput {
   year?: number;
   lifeArea?: string;
   status?: GoalStatus;
+  progressMode?: GoalProgressMode;
   progress?: number;
   dueDate?: string;
 }
@@ -88,6 +91,7 @@ function mapPrismaMonthlyGoal(goal: PrismaMonthlyGoal): MonthlyGoal {
     year: goal.year,
     lifeArea: goal.lifeArea,
     status: goal.status as GoalStatus,
+    progressMode: goal.progressMode as GoalProgressMode,
     progress: goal.progress,
     dueDate: formatDateOnly(goal.dueDate),
     createdAt: goal.createdAt.toISOString(),
@@ -155,6 +159,7 @@ export async function createMonthlyGoalForUser(
       year: input.year,
       lifeArea: input.lifeArea,
       status: input.status,
+      progressMode: input.progressMode,
       progress: clampProgress(input.progress),
       dueDate: parseDateOnly(input.dueDate),
       ...(createdAt
@@ -206,6 +211,10 @@ export async function updateMonthlyGoalForUser(
     updateData.status = input.status;
   }
 
+  if (input.progressMode !== undefined) {
+    updateData.progressMode = input.progressMode;
+  }
+
   if (input.progress !== undefined) {
     updateData.progress = clampProgress(input.progress);
   }
@@ -230,8 +239,30 @@ export async function deleteMonthlyGoalForUser(userId: string, goalId: string) {
 
   assertOwnedMonthlyGoal(existingGoal, userId);
 
-  await prisma.monthlyGoal.delete({
-    where: { id: goalId },
+  await prisma.$transaction(async (tx) => {
+    await tx.weeklyGoal.updateMany({
+      where: {
+        userId,
+        monthlyGoalId: goalId,
+      },
+      data: {
+        monthlyGoalId: null,
+      },
+    });
+
+    await tx.dailyTask.updateMany({
+      where: {
+        userId,
+        monthlyGoalId: goalId,
+      },
+      data: {
+        monthlyGoalId: null,
+      },
+    });
+
+    await tx.monthlyGoal.delete({
+      where: { id: goalId },
+    });
   });
 }
 
@@ -253,6 +284,10 @@ export function normalizeMonthlyGoalCreatePayload(
     typeof candidate.createdAt === "string" ? candidate.createdAt : undefined;
   const progress =
     typeof candidate.progress === "number" ? candidate.progress : 0;
+  const progressMode =
+    typeof candidate.progressMode === "string"
+      ? candidate.progressMode
+      : "linked_items";
   const month =
     typeof candidate.month === "number" ? candidate.month : Number.NaN;
   const year =
@@ -270,6 +305,10 @@ export function normalizeMonthlyGoalCreatePayload(
     throw new Error("Use a valid monthly goal status.");
   }
 
+  if (!goalProgressModes.has(progressMode as GoalProgressMode)) {
+    throw new Error("Use a valid progress mode.");
+  }
+
   return {
     id: typeof candidate.id === "string" ? candidate.id : undefined,
     title,
@@ -278,6 +317,7 @@ export function normalizeMonthlyGoalCreatePayload(
     year,
     lifeArea,
     status: candidate.status as GoalStatus,
+    progressMode: progressMode as GoalProgressMode,
     progress,
     dueDate,
     createdAt,
@@ -339,6 +379,16 @@ export function normalizeMonthlyGoalUpdatePayload(
       throw new Error("Use a valid monthly goal status.");
     }
     update.status = candidate.status as GoalStatus;
+  }
+
+  if (candidate.progressMode !== undefined) {
+    if (
+      typeof candidate.progressMode !== "string" ||
+      !goalProgressModes.has(candidate.progressMode as GoalProgressMode)
+    ) {
+      throw new Error("Use a valid progress mode.");
+    }
+    update.progressMode = candidate.progressMode as GoalProgressMode;
   }
 
   if (candidate.progress !== undefined) {

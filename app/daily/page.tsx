@@ -114,6 +114,7 @@ export default function DailyPage() {
         <DailyTaskForm
           key={`daily-task-${selectedDate}`}
           weeklyGoals={state.weeklyGoals}
+          monthlyGoals={state.monthlyGoals}
           lifeAreas={state.lifeAreas}
           defaultDate={effectiveSelectedDate}
           onSubmit={(value) => {
@@ -150,6 +151,7 @@ export default function DailyPage() {
 
       <TaskList
         tasks={tasks}
+        monthlyGoals={state.monthlyGoals}
         weeklyGoalLookup={weeklyGoalLookup}
         lifeAreas={state.lifeAreas}
         emptyTitle={t("planning.dayPage.noTasks")}

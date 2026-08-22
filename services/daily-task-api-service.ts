@@ -5,6 +5,7 @@ import type { DailyTask } from "@/types";
 export interface DailyTaskApiCreateInput {
   id?: string;
   weeklyGoalId?: string | null;
+  monthlyGoalId?: string | null;
   title: string;
   note: string;
   date: string;
@@ -17,6 +18,7 @@ export interface DailyTaskApiCreateInput {
 
 export interface DailyTaskApiUpdateInput {
   weeklyGoalId?: string | null;
+  monthlyGoalId?: string | null;
   title?: string;
   note?: string;
   date?: string;

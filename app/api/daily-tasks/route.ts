@@ -86,7 +86,8 @@ export async function POST(request: Request) {
     const status =
       message === "Daily task id already exists."
         ? 409
-        : message === "Weekly goal not found."
+        : message === "Weekly goal not found." ||
+            message === "Monthly goal not found."
           ? 404
           : message.startsWith("Use a valid")
             ? 400

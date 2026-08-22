@@ -1,6 +1,6 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
 
-import { getWeekRange, toDateKey } from "@/lib/date";
+import { getMonthRange, getWeekRange, toDateKey } from "@/lib/date";
 import { average } from "@/lib/utils";
 import type {
   AppState,
@@ -22,19 +22,92 @@ function inferGoalStatus(progress: number): GoalStatus {
   return "in_progress";
 }
 
+function clampProgress(value: number) {
+  return Math.min(Math.max(Math.round(value), 0), 100);
+}
+
+function countUniqueCompletedTaskDates(
+  tasks: DailyTask[],
+  predicate: (task: DailyTask) => boolean,
+) {
+  return new Set(
+    tasks
+      .filter((task) => task.completed)
+      .filter(predicate)
+      .map((task) => task.date),
+  ).size;
+}
+
+function calculateDailyWeeklyGoalProgress(
+  tasks: DailyTask[],
+  weeklyGoal: WeeklyGoal,
+) {
+  const completedDays = countUniqueCompletedTaskDates(
+    tasks,
+    (task) =>
+      task.weeklyGoalId === weeklyGoal.id &&
+      task.date >= weeklyGoal.startDate &&
+      task.date <= weeklyGoal.endDate,
+  );
+
+  return clampProgress((completedDays / 7) * 100);
+}
+
+function calculateDailyMonthlyGoalProgress(
+  tasks: DailyTask[],
+  weeklyGoals: WeeklyGoal[],
+  monthlyGoal: MonthlyGoal,
+) {
+  const { startKey, endKey } = getMonthRange(new Date(monthlyGoal.year, monthlyGoal.month - 1, 1));
+  const linkedWeeklyGoalIds = new Set(
+    weeklyGoals
+      .filter((weeklyGoal) => weeklyGoal.monthlyGoalId === monthlyGoal.id)
+      .map((weeklyGoal) => weeklyGoal.id),
+  );
+
+  const completedDays = countUniqueCompletedTaskDates(
+    tasks,
+    (task) => {
+      if (task.monthlyGoalId) {
+        return (
+          task.monthlyGoalId === monthlyGoal.id &&
+          task.date >= startKey &&
+          task.date <= endKey
+        );
+      }
+
+      if (!task.weeklyGoalId) {
+        return false;
+      }
+
+      return (
+        linkedWeeklyGoalIds.has(task.weeklyGoalId) &&
+        task.date >= startKey &&
+        task.date <= endKey
+      );
+    },
+  );
+  const daysInMonth =
+    differenceInCalendarDays(parseISO(endKey), parseISO(startKey)) + 1;
+
+  return clampProgress((completedDays / daysInMonth) * 100);
+}
+
 export function recalculateAppState(state: AppState): AppState {
   const weeklyGoals = state.weeklyGoals.map((weeklyGoal) => {
     const linkedTasks = state.dailyTasks.filter(
       (task) => task.weeklyGoalId === weeklyGoal.id,
     );
     const progress =
-      linkedTasks.length === 0
-        ? weeklyGoal.progress
-        : Math.round(
-            (linkedTasks.filter((task) => task.completed).length /
-              linkedTasks.length) *
-              100,
-          );
+      weeklyGoal.progressMode === "daily"
+        ? calculateDailyWeeklyGoalProgress(state.dailyTasks, weeklyGoal)
+        : linkedTasks.length === 0
+          ? weeklyGoal.progress
+          : Math.round(
+              (linkedTasks.filter((task) => task.completed).length /
+                linkedTasks.length) *
+                100,
+            );
 
     return {
       ...weeklyGoal,
@@ -51,9 +124,15 @@ export function recalculateAppState(state: AppState): AppState {
       (weeklyGoal) => weeklyGoal.monthlyGoalId === monthlyGoal.id,
     );
     const progress =
-      linkedWeeklyGoals.length === 0
-        ? monthlyGoal.progress
-        : Math.round(average(linkedWeeklyGoals.map((goal) => goal.progress)));
+      monthlyGoal.progressMode === "daily"
+        ? calculateDailyMonthlyGoalProgress(
+            state.dailyTasks,
+            state.weeklyGoals,
+            monthlyGoal,
+          )
+        : linkedWeeklyGoals.length === 0
+          ? monthlyGoal.progress
+          : Math.round(average(linkedWeeklyGoals.map((goal) => goal.progress)));
 
     return {
       ...monthlyGoal,
@@ -149,6 +228,38 @@ export function getMonthlyGoalsForWeekStart(
 ) {
   const weekStartKey = getWeekRange(dateKey).startKey;
   return getMonthlyGoalsForDate(monthlyGoals, weekStartKey);
+}
+
+export function resolveDailyTaskMonthlyGoalId(
+  monthlyGoals: MonthlyGoal[],
+  weeklyGoals: WeeklyGoal[],
+  task: Pick<DailyTask, "date" | "weeklyGoalId" | "monthlyGoalId">,
+) {
+  const availableMonthlyGoals = getMonthlyGoalsForDate(monthlyGoals, task.date);
+
+  if (
+    task.monthlyGoalId &&
+    availableMonthlyGoals.some((goal) => goal.id === task.monthlyGoalId)
+  ) {
+    return task.monthlyGoalId;
+  }
+
+  const parentMonthlyGoalId = task.weeklyGoalId
+    ? weeklyGoals.find((goal) => goal.id === task.weeklyGoalId)?.monthlyGoalId ?? null
+    : null;
+
+  if (
+    parentMonthlyGoalId &&
+    availableMonthlyGoals.some((goal) => goal.id === parentMonthlyGoalId)
+  ) {
+    return parentMonthlyGoalId;
+  }
+
+  if (availableMonthlyGoals.length === 1) {
+    return availableMonthlyGoals[0]?.id ?? null;
+  }
+
+  return null;
 }
 
 export function buildLifeAreaDistribution(

@@ -187,6 +187,18 @@ export function markJournalEntriesDatabaseMigrationComplete(scope: string) {
 function normalizeLoadedState(state: AppState): AppState {
   return {
     ...state,
+    monthlyGoals: state.monthlyGoals.map((goal) => ({
+      ...goal,
+      progressMode: goal.progressMode ?? "linked_items",
+    })),
+    weeklyGoals: state.weeklyGoals.map((goal) => ({
+      ...goal,
+      progressMode: goal.progressMode ?? "linked_items",
+    })),
+    dailyTasks: state.dailyTasks.map((task) => ({
+      ...task,
+      monthlyGoalId: task.monthlyGoalId ?? null,
+    })),
     journalEntries: state.journalEntries.map((entry) => ({
       ...entry,
       sections: normalizeJournalSections(entry.sections),

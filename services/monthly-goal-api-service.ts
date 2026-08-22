@@ -10,6 +10,7 @@ export interface MonthlyGoalApiCreateInput {
   year: number;
   lifeArea: string;
   status: MonthlyGoal["status"];
+  progressMode: MonthlyGoal["progressMode"];
   progress: number;
   dueDate?: string;
   createdAt?: string;
@@ -22,6 +23,7 @@ export interface MonthlyGoalApiUpdateInput {
   year?: number;
   lifeArea?: string;
   status?: MonthlyGoal["status"];
+  progressMode?: MonthlyGoal["progressMode"];
   progress?: number;
   dueDate?: string;
 }

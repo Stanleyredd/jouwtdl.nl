@@ -141,6 +141,7 @@ export default function DashboardPage() {
             </div>
             <TaskList
               tasks={review.completedTasks}
+              monthlyGoals={state.monthlyGoals}
               weeklyGoalLookup={weeklyGoalLookup}
               lifeAreas={state.lifeAreas}
               emptyTitle={t("dashboard.nothingFinished")}
@@ -159,6 +160,7 @@ export default function DashboardPage() {
             {review.incompleteTasks.length > 0 ? (
               <TaskList
                 tasks={review.incompleteTasks}
+                monthlyGoals={state.monthlyGoals}
                 weeklyGoalLookup={weeklyGoalLookup}
                 lifeAreas={state.lifeAreas}
                 emptyTitle={t("dashboard.nothingOpen")}

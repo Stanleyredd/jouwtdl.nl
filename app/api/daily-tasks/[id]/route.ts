@@ -66,7 +66,9 @@ export async function PATCH(
         ? error.message
         : "Daily task could not be updated right now.";
     const status =
-      message === "Daily task not found." || message === "Weekly goal not found."
+      message === "Daily task not found." ||
+      message === "Weekly goal not found." ||
+      message === "Monthly goal not found."
         ? 404
         : message.startsWith("Use a valid")
           ? 400

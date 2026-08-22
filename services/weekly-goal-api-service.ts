@@ -11,6 +11,7 @@ export interface WeeklyGoalApiCreateInput {
   endDate: string;
   lifeArea: string;
   status: WeeklyGoal["status"];
+  progressMode: WeeklyGoal["progressMode"];
   progress: number;
   createdAt?: string;
 }
@@ -23,6 +24,7 @@ export interface WeeklyGoalApiUpdateInput {
   endDate?: string;
   lifeArea?: string;
   status?: WeeklyGoal["status"];
+  progressMode?: WeeklyGoal["progressMode"];
   progress?: number;
 }
 

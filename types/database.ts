@@ -172,6 +172,7 @@ export interface Database {
           year: number;
           life_area: string;
           status: string;
+          progress_mode: string;
           progress: number;
           due_date: string | null;
           created_at: string;
@@ -186,6 +187,7 @@ export interface Database {
           year: number;
           life_area: string;
           status?: string;
+          progress_mode?: string;
           progress?: number;
           due_date?: string | null;
           created_at?: string;
@@ -200,6 +202,7 @@ export interface Database {
           year?: number;
           life_area?: string;
           status?: string;
+          progress_mode?: string;
           progress?: number;
           due_date?: string | null;
           created_at?: string;
@@ -219,6 +222,7 @@ export interface Database {
           end_date: string;
           life_area: string;
           status: string;
+          progress_mode: string;
           progress: number;
           created_at: string;
           updated_at: string;
@@ -234,6 +238,7 @@ export interface Database {
           end_date: string;
           life_area: string;
           status?: string;
+          progress_mode?: string;
           progress?: number;
           created_at?: string;
           updated_at?: string;
@@ -249,6 +254,7 @@ export interface Database {
           end_date?: string;
           life_area?: string;
           status?: string;
+          progress_mode?: string;
           progress?: number;
           created_at?: string;
           updated_at?: string;
@@ -260,6 +266,7 @@ export interface Database {
           id: string;
           user_id: string;
           weekly_goal_id: string | null;
+          monthly_goal_id: string | null;
           title: string;
           note: string;
           date: string;
@@ -274,6 +281,7 @@ export interface Database {
           id: string;
           user_id: string;
           weekly_goal_id?: string | null;
+          monthly_goal_id?: string | null;
           title: string;
           note?: string;
           date: string;
@@ -288,6 +296,7 @@ export interface Database {
           id?: string;
           user_id?: string;
           weekly_goal_id?: string | null;
+          monthly_goal_id?: string | null;
           title?: string;
           note?: string;
           date?: string;

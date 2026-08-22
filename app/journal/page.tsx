@@ -171,6 +171,7 @@ export default function JournalPage() {
           onCreateTask={(text, weeklyGoalId, date, lifeArea) =>
             addDailyTask({
               weeklyGoalId,
+              monthlyGoalId: null,
               title: text,
               note: "Created from journal reflection.",
               date,
