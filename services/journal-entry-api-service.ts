@@ -1,7 +1,7 @@
 "use client";
 
 import type { AppLanguage } from "@/lib/i18n";
-import type { JournalEntry, JournalEntryInput } from "@/types";
+import type { JournalEntry, JournalEntryInput, TomorrowSetup } from "@/types";
 
 export interface JournalEntryApiSaveInput extends JournalEntryInput {
   language: AppLanguage;
@@ -10,12 +10,33 @@ export interface JournalEntryApiSaveInput extends JournalEntryInput {
   aiSummary?: string;
   aiSummaryError?: string | null;
   aiSummaryUpdatedAt?: string;
+  finalizedAt?: string;
 }
 
 export interface JournalEntrySummaryApiInput {
   lifeAreas: string[];
   aiSummary?: string;
   aiSummaryError?: string | null;
+}
+
+export interface JournalSectionApiSaveInput {
+  content: string;
+  rawTranscript: string;
+  editedTranscript: string;
+  language: AppLanguage;
+  lifeAreas: string[];
+}
+
+export interface JournalTomorrowSetupApiSaveInput {
+  tomorrowSetup: TomorrowSetup;
+  rawTranscript: string;
+  editedTranscript: string;
+  language: AppLanguage;
+  lifeAreas: string[];
+}
+
+export interface FinalizeJournalEntryApiInput {
+  lifeAreas: string[];
 }
 
 async function parseJournalEntryResponse<T>(
@@ -104,6 +125,84 @@ export async function updateJournalSummaryByDate(
   if (!response.ok) {
     throw new Error(
       result.error ?? "Journal summary could not be saved right now.",
+    );
+  }
+
+  return result.data;
+}
+
+export async function saveJournalSectionByDate(
+  date: string,
+  sectionKey: string,
+  input: JournalSectionApiSaveInput,
+) {
+  const response = await fetch(
+    `/api/journal-entries/${encodeURIComponent(date)}/sections/${encodeURIComponent(sectionKey)}`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  );
+
+  const result = await parseJournalEntryResponse<JournalEntry>(response);
+
+  if (!result.data) {
+    throw new Error(result.error ?? "Journal section could not be saved right now.");
+  }
+
+  return result.data;
+}
+
+export async function saveTomorrowSetupByDate(
+  date: string,
+  input: JournalTomorrowSetupApiSaveInput,
+) {
+  const response = await fetch(
+    `/api/journal-entries/${encodeURIComponent(date)}/tomorrow-setup`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  );
+
+  const result = await parseJournalEntryResponse<JournalEntry>(response);
+
+  if (!result.data) {
+    throw new Error(result.error ?? "Tomorrow setup could not be saved right now.");
+  }
+
+  return result.data;
+}
+
+export async function finalizeJournalEntryByDate(
+  date: string,
+  input: FinalizeJournalEntryApiInput,
+) {
+  const response = await fetch(
+    `/api/journal-entries/${encodeURIComponent(date)}/finalize`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  );
+
+  const result = await parseJournalEntryResponse<JournalEntry>(response);
+
+  if (!result.data) {
+    throw new Error(
+      result.error ?? "Journal summary could not be generated right now.",
     );
   }
 

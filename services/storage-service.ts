@@ -207,6 +207,7 @@ function normalizeLoadedState(state: AppState): AppState {
       aiSummary: entry.aiSummary ?? "",
       aiSummaryError: entry.aiSummaryError ?? null,
       aiSummaryUpdatedAt: entry.aiSummaryUpdatedAt,
+      finalizedAt: entry.finalizedAt ?? null,
     })),
   };
 }

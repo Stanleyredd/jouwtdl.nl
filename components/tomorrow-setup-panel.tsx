@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useMemo } from "react";
+import { LoaderCircle, Save } from "lucide-react";
 
 import { useLanguage } from "@/hooks/use-language";
 import { type VoiceResult } from "@/hooks/use-voice-transcription";
@@ -20,6 +21,11 @@ interface TomorrowSetupPanelProps {
   onCancelVoice?: () => void;
   onStopVoice?: () => void;
   onResetVoice?: (sectionId: string, fieldId: string) => void;
+  statusText?: string | null;
+  statusTone?: "default" | "success" | "error";
+  isSaving?: boolean;
+  isSaveDisabled?: boolean;
+  onSave?: () => void;
 }
 
 export function TomorrowSetupPanel({
@@ -32,6 +38,11 @@ export function TomorrowSetupPanel({
   onCancelVoice,
   onStopVoice,
   onResetVoice,
+  statusText,
+  statusTone = "default",
+  isSaving = false,
+  isSaveDisabled = false,
+  onSave,
 }: TomorrowSetupPanelProps) {
   const { t } = useLanguage();
   const topTasksText = useMemo(
@@ -72,9 +83,41 @@ export function TomorrowSetupPanel({
 
   return (
     <section className="app-surface app-panel">
-      <p className="text-sm font-medium text-[color:var(--foreground)]">
-        {t("journal.tomorrow")}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm font-medium text-[color:var(--foreground)]">
+          {t("journal.tomorrow")}
+        </p>
+
+        {onSave ? (
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={isSaveDisabled}
+            className="app-button-secondary text-sm"
+          >
+            {isSaving ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {isSaving ? t("journal.sectionSaving") : t("journal.tomorrowSave")}
+          </button>
+        ) : null}
+      </div>
+
+      {statusText ? (
+        <p
+          className={`mt-3 text-sm ${
+            statusTone === "error"
+              ? "app-text-danger"
+              : statusTone === "success"
+                ? "text-[color:var(--accent-strong)]"
+                : "text-[color:var(--muted)]"
+          }`}
+        >
+          {statusText}
+        </p>
+      ) : null}
 
       <div className="mt-4 grid gap-4">
         <MemoField

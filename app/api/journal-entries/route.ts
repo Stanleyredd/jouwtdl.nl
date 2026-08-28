@@ -85,8 +85,15 @@ export async function POST(request: Request) {
   }
 
   try {
-    const journalEntry = await saveJournalEntryForUser(context.user.id, payload);
-    return Response.json({ journalEntry }, { status: 201 });
+    const { journalEntry, wasCreated } = await saveJournalEntryForUser(
+      context.user.id,
+      payload,
+    );
+
+    return Response.json(
+      { journalEntry },
+      { status: wasCreated ? 201 : 200 },
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Journal could not be saved. Try again.";

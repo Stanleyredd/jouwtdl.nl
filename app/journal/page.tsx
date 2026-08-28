@@ -24,8 +24,9 @@ export default function JournalPage() {
     journalError,
     addDailyTask,
     addWeeklyGoal,
-    saveJournalEntry,
-    updateJournalSummary,
+    finalizeJournalEntry,
+    saveJournalSection,
+    saveTomorrowSetup,
   } = useAppState();
   const {
     voice,
@@ -133,12 +134,16 @@ export default function JournalPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-[color:var(--foreground)]">
-                {t("journal.savedForDay")}
+                {existingEntry.finalizedAt
+                  ? t("journal.savedForDay")
+                  : t("journal.draftSavedForDay")}
               </p>
               <p className="mt-1 text-sm text-[color:var(--muted)]">
                 {existingEntry.aiSummary ||
                   existingEntry.oneSentenceDaySummary ||
-                  t("journal.savedNoteFallback")}
+                  (existingEntry.finalizedAt
+                    ? t("journal.savedNoteFallback")
+                    : t("journal.draftNoteFallback"))}
               </p>
             </div>
             <p className="text-sm text-[color:var(--muted)]">
@@ -166,8 +171,9 @@ export default function JournalPage() {
           voice={voice}
           activeVoiceTarget={activeVoiceTarget}
           voiceInsertHandlerRef={voiceInsertHandlerRef}
-          onSave={saveJournalEntry}
-          onUpdateSummary={updateJournalSummary}
+          onFinalize={finalizeJournalEntry}
+          onSaveSection={saveJournalSection}
+          onSaveTomorrowSetup={saveTomorrowSetup}
           onCreateTask={(text, weeklyGoalId, date, lifeArea) =>
             addDailyTask({
               weeklyGoalId,

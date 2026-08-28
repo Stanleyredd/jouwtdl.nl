@@ -65,6 +65,8 @@ export interface Database {
           ai_summary: string;
           ai_summary_error: string | null;
           ai_summary_updated_at: string | null;
+          finalized_at: string | null;
+          completion_webhook_sent_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -78,6 +80,8 @@ export interface Database {
           ai_summary?: string;
           ai_summary_error?: string | null;
           ai_summary_updated_at?: string | null;
+          finalized_at?: string | null;
+          completion_webhook_sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -91,6 +95,8 @@ export interface Database {
           ai_summary?: string;
           ai_summary_error?: string | null;
           ai_summary_updated_at?: string | null;
+          finalized_at?: string | null;
+          completion_webhook_sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

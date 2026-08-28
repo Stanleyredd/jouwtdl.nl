@@ -124,6 +124,7 @@ export interface JournalEntry {
   aiSummary: string;
   aiSummaryError: string | null;
   aiSummaryUpdatedAt?: string;
+  finalizedAt?: string | null;
   sentiment: JournalSentiment;
   moodScore: number;
   powerLevel: number;

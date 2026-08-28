@@ -23,8 +23,11 @@ import {
   updateDailyTaskById,
 } from "@/services/daily-task-api-service";
 import {
+  finalizeJournalEntryByDate,
   listJournalEntries,
   saveJournalEntry as saveJournalEntryRequest,
+  saveJournalSectionByDate,
+  saveTomorrowSetupByDate,
   updateJournalSummaryByDate,
 } from "@/services/journal-entry-api-service";
 import {
@@ -68,6 +71,7 @@ import type {
   JournalEntryInput,
   MonthlyGoal,
   MonthlyGoalInput,
+  TomorrowSetup,
   WeeklyGoal,
   WeeklyGoalInput,
 } from "@/types";
@@ -98,6 +102,24 @@ interface AppContextValue {
   deprioritizeTask: (id: string) => void;
   setDailyFocus: (input: DailyFocusInput) => void;
   saveJournalEntry: (input: JournalEntryInput) => Promise<JournalEntry>;
+  saveJournalSection: (
+    date: string,
+    input: {
+      sectionKey: string;
+      content: string;
+      rawTranscript: string;
+      editedTranscript: string;
+    },
+  ) => Promise<JournalEntry>;
+  saveTomorrowSetup: (
+    date: string,
+    input: {
+      tomorrowSetup: TomorrowSetup;
+      rawTranscript: string;
+      editedTranscript: string;
+    },
+  ) => Promise<JournalEntry>;
+  finalizeJournalEntry: (date: string) => Promise<JournalEntry>;
   updateJournalSummary: (
     date: string,
     updates: {
@@ -183,6 +205,36 @@ function upsertJournalEntry(entries: JournalEntry[], nextEntry: JournalEntry) {
     : [...entries, nextEntry];
 
   return nextEntries.sort((left, right) => left.date.localeCompare(right.date));
+}
+
+function buildLocalJournalEntry(
+  currentState: AppState,
+  input: JournalEntryInput,
+  existingEntry?: JournalEntry,
+): JournalEntry {
+  const timestamp = new Date().toISOString();
+  const analysis = analyzeJournalEntryContent(input, currentState.lifeAreas);
+
+  return {
+    id: existingEntry?.id ?? createId("journal"),
+    date: input.date,
+    sections: input.sections,
+    rawTranscript: input.rawTranscript,
+    editedTranscript: input.editedTranscript,
+    aiSummary: existingEntry?.aiSummary ?? "",
+    aiSummaryError: existingEntry?.aiSummaryError ?? null,
+    aiSummaryUpdatedAt: existingEntry?.aiSummaryUpdatedAt,
+    finalizedAt: existingEntry?.finalizedAt ?? null,
+    tomorrowSetup: input.tomorrowSetup,
+    sentiment: analysis.sentiment,
+    moodScore: analysis.moodScore,
+    powerLevel: analysis.powerLevel,
+    lifeAreasMentioned: analysis.lifeAreasMentioned,
+    blockersDetected: analysis.blockersDetected,
+    oneSentenceDaySummary: analysis.oneSentenceDaySummary,
+    createdAt: existingEntry?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  };
 }
 
 function upsertById<T extends { id: string }>(items: T[], nextItem: T) {
@@ -625,6 +677,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 aiSummary: localEntry.aiSummary,
                 aiSummaryError: localEntry.aiSummaryError,
                 aiSummaryUpdatedAt: localEntry.aiSummaryUpdatedAt,
+                finalizedAt:
+                  localEntry.finalizedAt ??
+                  (localEntry.aiSummary.trim()
+                    ? localEntry.aiSummaryUpdatedAt ?? localEntry.updatedAt
+                    : undefined),
               });
             }
 
@@ -1548,31 +1605,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
 
           commit((currentState) => {
-            const timestamp = new Date().toISOString();
             const existingEntry = currentState.journalEntries.find(
               (entry) => entry.date === input.date,
             );
-            const analysis = analyzeJournalEntryContent(input, currentState.lifeAreas);
-
-            const entry: JournalEntry = {
-              id: existingEntry?.id ?? createId("journal"),
-              date: input.date,
-              sections: input.sections,
-              rawTranscript: input.rawTranscript,
-              editedTranscript: input.editedTranscript,
-              aiSummary: existingEntry?.aiSummary ?? "",
-              aiSummaryError: existingEntry?.aiSummaryError ?? null,
-              aiSummaryUpdatedAt: existingEntry?.aiSummaryUpdatedAt,
-              tomorrowSetup: input.tomorrowSetup,
-              sentiment: analysis.sentiment,
-              moodScore: analysis.moodScore,
-              powerLevel: analysis.powerLevel,
-              lifeAreasMentioned: analysis.lifeAreasMentioned,
-              blockersDetected: analysis.blockersDetected,
-              oneSentenceDaySummary: analysis.oneSentenceDaySummary,
-              createdAt: existingEntry?.createdAt ?? timestamp,
-              updatedAt: timestamp,
-            };
+            const entry = buildLocalJournalEntry(currentState, input, existingEntry);
             savedEntry = entry;
 
             if (process.env.NODE_ENV === "development") {
@@ -1616,6 +1652,148 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ? caughtError
             : new Error("Journal could not be saved. Try again.");
         }
+      },
+      async saveJournalSection(date, input) {
+        if (user) {
+          const savedEntry = await saveJournalSectionByDate(date, input.sectionKey, {
+            content: input.content,
+            rawTranscript: input.rawTranscript,
+            editedTranscript: input.editedTranscript,
+            language,
+            lifeAreas: latestStateRef.current.lifeAreas,
+          });
+
+          setState((currentState) =>
+            recalculateAppState({
+              ...currentState,
+              journalEntries: upsertJournalEntry(
+                currentState.journalEntries,
+                savedEntry,
+              ),
+            }),
+          );
+
+          return savedEntry;
+        }
+
+        let savedEntry: JournalEntry | null = null;
+
+        commit((currentState) => {
+          const existingEntry = currentState.journalEntries.find(
+            (entry) => entry.date === date,
+          );
+          const nextSections = {
+            ...(existingEntry?.sections ?? {}),
+            [input.sectionKey]: {
+              memo: input.content,
+            },
+          };
+          const entry = buildLocalJournalEntry(
+            currentState,
+            {
+              date,
+              sections: nextSections,
+              rawTranscript: input.rawTranscript,
+              editedTranscript: input.editedTranscript,
+              tomorrowSetup: existingEntry?.tomorrowSetup ?? {
+                mainFocus: "",
+                topTasks: [],
+                watchOutFor: "",
+                intention: "",
+              },
+            },
+            existingEntry,
+          );
+
+          savedEntry = entry;
+
+          return {
+            ...currentState,
+            journalEntries: upsertJournalEntry(currentState.journalEntries, entry),
+          };
+        });
+
+        if (!savedEntry) {
+          throw new Error("Journal section could not be saved right now.");
+        }
+
+        return savedEntry;
+      },
+      async saveTomorrowSetup(date, input) {
+        if (user) {
+          const savedEntry = await saveTomorrowSetupByDate(date, {
+            tomorrowSetup: input.tomorrowSetup,
+            rawTranscript: input.rawTranscript,
+            editedTranscript: input.editedTranscript,
+            language,
+            lifeAreas: latestStateRef.current.lifeAreas,
+          });
+
+          setState((currentState) =>
+            recalculateAppState({
+              ...currentState,
+              journalEntries: upsertJournalEntry(
+                currentState.journalEntries,
+                savedEntry,
+              ),
+            }),
+          );
+
+          return savedEntry;
+        }
+
+        let savedEntry: JournalEntry | null = null;
+
+        commit((currentState) => {
+          const existingEntry = currentState.journalEntries.find(
+            (entry) => entry.date === date,
+          );
+          const entry = buildLocalJournalEntry(
+            currentState,
+            {
+              date,
+              sections: existingEntry?.sections ?? {},
+              rawTranscript: input.rawTranscript,
+              editedTranscript: input.editedTranscript,
+              tomorrowSetup: input.tomorrowSetup,
+            },
+            existingEntry,
+          );
+
+          savedEntry = entry;
+
+          return {
+            ...currentState,
+            journalEntries: upsertJournalEntry(currentState.journalEntries, entry),
+          };
+        });
+
+        if (!savedEntry) {
+          throw new Error("Tomorrow setup could not be saved right now.");
+        }
+
+        return savedEntry;
+      },
+      async finalizeJournalEntry(date) {
+        if (user) {
+          const savedEntry = await finalizeJournalEntryByDate(date, {
+            lifeAreas: latestStateRef.current.lifeAreas,
+          });
+
+          setState((currentState) =>
+            recalculateAppState({
+              ...currentState,
+              journalEntries: upsertJournalEntry(
+                currentState.journalEntries,
+                savedEntry,
+              ),
+            }),
+          );
+
+          return savedEntry;
+        }
+
+        throw new Error("Log in om je journal af te ronden.");
       },
       async updateJournalSummary(date, updates) {
         if (user) {
