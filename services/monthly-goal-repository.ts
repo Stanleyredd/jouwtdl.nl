@@ -223,8 +223,11 @@ export async function updateMonthlyGoalForUser(
     updateData.dueDate = parseDateOnly(input.dueDate);
   }
 
+  // Scoped by the (id, userId) composite unique key, not by id alone: even if
+  // the assertOwnedMonthlyGoal check above were ever removed or bypassed,
+  // this query itself cannot touch a row belonging to another user.
   const updatedGoal = await prisma.monthlyGoal.update({
-    where: { id: goalId },
+    where: { id_userId: { id: goalId, userId } },
     data: updateData,
   });
 
@@ -261,7 +264,7 @@ export async function deleteMonthlyGoalForUser(userId: string, goalId: string) {
     });
 
     await tx.monthlyGoal.delete({
-      where: { id: goalId },
+      where: { id_userId: { id: goalId, userId } },
     });
   });
 }

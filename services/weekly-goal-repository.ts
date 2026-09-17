@@ -260,8 +260,11 @@ export async function updateWeeklyGoalForUser(
     updateData.progress = clampProgress(input.progress);
   }
 
+  // Scoped by the (id, userId) composite unique key, not by id alone: even if
+  // the assertOwnedWeeklyGoal check above were ever removed or bypassed, this
+  // query itself cannot touch a row belonging to another user.
   const updatedGoal = await prisma.weeklyGoal.update({
-    where: { id: goalId },
+    where: { id_userId: { id: goalId, userId } },
     data: updateData,
   });
 
@@ -288,7 +291,7 @@ export async function deleteWeeklyGoalForUser(userId: string, goalId: string) {
       },
     }),
     prisma.weeklyGoal.delete({
-      where: { id: goalId },
+      where: { id_userId: { id: goalId, userId } },
     }),
   ]);
 }

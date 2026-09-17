@@ -256,8 +256,11 @@ export async function updateDailyTaskForUser(
     updateData.carryOverCount = normalizeCarryOverCount(input.carryOverCount);
   }
 
+  // Scoped by the (id, userId) composite unique key, not by id alone: even if
+  // the assertOwnedDailyTask check above were ever removed or bypassed, this
+  // query itself cannot touch a row belonging to another user.
   const updatedTask = await prisma.dailyTask.update({
-    where: { id: taskId },
+    where: { id_userId: { id: taskId, userId } },
     data: updateData,
   });
 
@@ -273,7 +276,7 @@ export async function deleteDailyTaskForUser(userId: string, taskId: string) {
   assertOwnedDailyTask(existingTask, userId);
 
   await prisma.dailyTask.delete({
-    where: { id: taskId },
+    where: { id_userId: { id: taskId, userId } },
   });
 }
 

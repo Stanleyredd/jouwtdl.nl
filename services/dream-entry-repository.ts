@@ -156,8 +156,11 @@ export async function updateDreamEntryForUser(
     updateData.source = normalizeSource(input.source);
   }
 
+  // Scoped by the (id, userId) composite unique key, not by id alone: even if
+  // the assertOwnedDreamEntry check above were ever removed or bypassed, this
+  // query itself cannot touch a row belonging to another user.
   const updatedDream = await prisma.dreamEntry.update({
-    where: { id: dreamId },
+    where: { id_userId: { id: dreamId, userId } },
     data: updateData,
   });
 
@@ -173,7 +176,7 @@ export async function deleteDreamEntryForUser(userId: string, dreamId: string) {
   assertOwnedDreamEntry(existingDream, userId);
 
   await prisma.dreamEntry.delete({
-    where: { id: dreamId },
+    where: { id_userId: { id: dreamId, userId } },
   });
 }
 

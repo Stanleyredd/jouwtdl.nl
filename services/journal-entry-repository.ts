@@ -593,8 +593,12 @@ export async function updateJournalSummaryForUser(
     return null;
   }
 
+  // existingEntry.id was itself just found via the userId_entryDate composite
+  // key above, so this is not reachable with another user's entry — scoped
+  // by (id, userId) anyway for defense in depth, consistent with the other
+  // repositories.
   const updatedEntry = await prisma.journalEntry.update({
-    where: { id: existingEntry.id },
+    where: { id_userId: { id: existingEntry.id, userId } },
     data: {
       ...(input.aiSummary !== undefined
         ? {
@@ -639,9 +643,11 @@ export async function finalizeJournalEntryForUser(
   }
 
   const finalizedAt = existingEntry.finalizedAt ?? new Date();
+  // existingEntry.id was itself just found via the userId_entryDate composite
+  // key above; scoped by (id, userId) anyway for defense in depth.
   const updatedEntry = await prisma.journalEntry.update({
     where: {
-      id: existingEntry.id,
+      id_userId: { id: existingEntry.id, userId },
     },
     data: {
       aiSummary: input.aiSummary,
@@ -685,9 +691,11 @@ export async function markJournalCompletionWebhookSentForUser(
     return;
   }
 
+  // existingEntry.id was itself just found via the userId_entryDate composite
+  // key above; scoped by (id, userId) anyway for defense in depth.
   await prisma.journalEntry.update({
     where: {
-      id: existingEntry.id,
+      id_userId: { id: existingEntry.id, userId },
     },
     data: {
       completionWebhookSentAt: new Date(),
