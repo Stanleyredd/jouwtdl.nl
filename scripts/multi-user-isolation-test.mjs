@@ -4,13 +4,14 @@
  *
  * Creates two real accounts (User A, User B) through the actual signup +
  * NextAuth credentials login flow, gives each one a daily task, weekly goal,
- * monthly goal, dream, and journal entry, then verifies:
+ * monthly goal, dream, journal entry, and idea, then verifies:
  *
  *   - each user's list endpoints show only their own data;
  *   - unauthenticated requests to protected APIs get 401;
  *   - User B cannot read/update/delete any of User A's records by id
  *     (daily task, weekly goal, monthly goal, dream, journal finalize);
  *   - User B cannot link a new daily task to User A's weekly/monthly goal.
+ *   - both users can manage their own ideas, but not each other's by ID.
  *
  * Run against a disposable local app + database only -- never point
  * BASE_URL at a production deployment. See prisma/migrations for schema.
@@ -200,6 +201,92 @@ async function seedUserData(request, tag) {
   };
 }
 
+async function checkIdeas(requestA, requestB, userIdB) {
+  console.log("\n== Ideas: validation, persistence, and ownership ==");
+  const anonymous = client(new Map());
+  ok((await anonymous("/api/ideas")).status === 401, "Ideas collection requires a session");
+
+  for (const [tag, request] of [["A", requestA], ["B", requestB]]) {
+    const list = await request("/api/ideas");
+    ok(list.status === 200 && list.body?.ideas?.length === 0, `User ${tag} starts with no ideas`);
+  }
+
+  for (const payload of [
+    { title: " ", content: "Valid content" },
+    { title: "Valid title", content: 123 },
+    { title: "Valid title", content: "Valid content", category: "unknown" },
+    { title: "a".repeat(161), content: "Valid content" },
+    { title: "Valid title", content: "a".repeat(20001) },
+  ]) {
+    const invalid = await requestA("/api/ideas", { method: "POST", body: JSON.stringify(payload) });
+    ok(invalid.status === 400, "Rejects invalid idea fields");
+  }
+  const textPost = await requestA("/api/ideas", {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ title: "Plain-text request", content: "Not application/json" }),
+  });
+  ok(textPost.status === 400, "Rejects a plain-text write request");
+
+  const createA = await requestA("/api/ideas", {
+    method: "POST",
+    body: JSON.stringify({ title: "  Idea A  ", content: "  Content A  ", userId: userIdB, status: "completed" }),
+  });
+  const createB = await requestB("/api/ideas", {
+    method: "POST",
+    body: JSON.stringify({ title: "Idea B", content: "Content B", category: "trading", priority: "high" }),
+  });
+  const a = createA.body?.idea;
+  const b = createB.body?.idea;
+  ok(createA.status === 201 && a?.title === "Idea A" && a.content === "Content A" &&
+    a.category === "other" && a.priority === "normal" && a.status === "unprocessed",
+  "Create trims text and applies defaults; browser cannot override initial status");
+  ok(createB.status === 201 && b?.category === "trading" && b.priority === "high", "Create persists selected category and priority");
+  if (!a?.id || !b?.id) return;
+
+  const aPath = `/api/ideas/${a.id}`;
+  const bPath = `/api/ideas/${b.id}`;
+  const methods = [
+    { method: "GET" },
+    { method: "PATCH", body: JSON.stringify({ title: "Attempted overwrite" }) },
+    { method: "DELETE" },
+  ];
+  for (const [actor, request, path, ownId] of [
+    ["A", requestA, bPath, a.id],
+    ["B", requestB, aPath, b.id],
+  ]) {
+    const list = await request("/api/ideas");
+    ok(list.body?.ideas?.length === 1 && list.body.ideas[0].id === ownId, `User ${actor} lists only their own idea`);
+    for (const init of methods) {
+      const result = await request(path, init);
+      ok(result.status === 404, `User ${actor} cannot ${init.method} the other user's idea by ID`);
+    }
+  }
+  for (const init of methods) {
+    ok((await anonymous(aPath, init)).status === 401, `Anonymous ${init.method} is denied`);
+  }
+
+  const ownerRead = await requestA(aPath);
+  ok(ownerRead.status === 200 && ownerRead.body?.idea?.title === a.title, "Owner can still read the unchanged idea");
+  const invalidPatch = await requestA(aPath, { method: "PATCH", body: JSON.stringify({ status: "invalid" }) });
+  ok(invalidPatch.status === 400, "Rejects an invalid status update");
+  const changes = { title: "Updated A", content: "Updated content", category: "business", status: "completed", priority: "low" };
+  const update = await requestA(aPath, {
+    method: "PATCH",
+    body: JSON.stringify({ ...changes, userId: userIdB }),
+  });
+  ok(update.status === 200, "Owner can edit their idea");
+  const refreshed = await requestA("/api/ideas");
+  const persisted = refreshed.body?.ideas?.find((idea) => idea.id === a.id);
+  ok(persisted && Object.entries(changes).every(([key, value]) => persisted[key] === value) &&
+    persisted.createdAt === a.createdAt && persisted.updatedAt > a.updatedAt,
+  "Updated fields and completed status persist on reload; creation time is unchanged");
+  ok((await requestB(aPath)).status === 404, "PATCH cannot transfer ownership");
+  ok((await requestA(aPath, { method: "DELETE" })).status === 204, "Owner can manually delete their idea");
+  ok((await requestA(aPath)).status === 404, "Deleted idea is gone");
+  ok((await requestB(bPath)).status === 200, "User B's idea is unaffected");
+}
+
 async function main() {
   const emailA = `test-user-a-${RUN_ID}@example.test`;
   const emailB = `test-user-b-${RUN_ID}@example.test`;
@@ -222,6 +309,9 @@ async function main() {
 
   const requestA = client(sessionA.jar);
   const requestB = client(sessionB.jar);
+  const bSession = await requestB("/api/auth/session");
+  ok(Boolean(bSession.body?.user?.id), "User B has a server-side profile ID for spoofing tests");
+  await checkIdeas(requestA, requestB, bSession.body?.user?.id);
 
   console.log(`\n== 3. Unauthenticated access ==`);
   const noAuthDailyTasks = await fetch(`${BASE_URL}/api/daily-tasks`);

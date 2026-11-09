@@ -21,6 +21,7 @@ model Profile {
   updatedAt              DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
   journalEntries         JournalEntry[]
   dreamEntries           DreamEntry[]
+  ideaEntries            IdeaEntry[]
   monthlyGoals           MonthlyGoal[]
   weeklyGoals            WeeklyGoal[]
   dailyTasks             DailyTask[]
@@ -98,6 +99,44 @@ model DreamEntry {
   @@index([userId])
   @@index([userId, dreamDate])
   @@map("dream_entries")
+}
+
+enum IdeaCategory {
+  trading
+  business
+  content
+  ai_project
+  personal
+  other
+}
+
+enum IdeaStatus {
+  unprocessed
+  in_progress
+  completed
+}
+
+enum IdeaPriority {
+  low
+  normal
+  high
+}
+
+model IdeaEntry {
+  id        String       @id @default(uuid()) @db.Uuid
+  userId    String       @map("user_id") @db.Uuid
+  title     String
+  content   String
+  category  IdeaCategory @default(other)
+  status    IdeaStatus   @default(unprocessed)
+  priority  IdeaPriority @default(normal)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user      Profile      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([id, userId])
+  @@index([userId, createdAt])
+  @@map("idea_entries")
 }
 
 model MonthlyGoal {

@@ -7,6 +7,7 @@ import {
   Brain,
   ChartColumn,
   FolderKanban,
+  Lightbulb,
   MoonStar,
   SunMedium,
 } from "lucide-react";
@@ -18,6 +19,7 @@ const navigationItems = [
   { href: "/", labelKey: "nav.today", icon: SunMedium },
   { href: "/journal", labelKey: "nav.journal", icon: BookHeart },
   { href: "/dreams", labelKey: "nav.dreams", icon: MoonStar },
+  { href: "/ideas", labelKey: "nav.ideas", icon: Lightbulb },
   { href: "/planning", labelKey: "nav.planning", icon: FolderKanban },
   { href: "/dashboard", labelKey: "nav.dashboard", icon: ChartColumn },
   { href: "/tips", labelKey: "nav.tips", icon: Brain },
